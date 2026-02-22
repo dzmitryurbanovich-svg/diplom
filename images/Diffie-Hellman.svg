@@ -1,0 +1,197 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="711" height="324">
+    <defs/>
+    <g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 416 0 L 1107 0 L 1107 304 L 416 304 L 416 0" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="#ffffff" stroke="none" d="M 416 0 L 416 22 L 527.1259765625 22 L 538.1259765625 11 L 538.1259765625 0 L 416 0"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 416 0 L 416 22 L 527.1259765625 22 L 538.1259765625 11 L 538.1259765625 0 L 416 0 L 416 0" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <g>
+                <path fill="none" stroke="none"/>
+                <text fill="#000000" stroke="none" font-family="Arial" font-size="13px" font-style="normal" font-weight="normal" text-decoration="none" x="440.72998046875" y="15.5">Diffie-Hellman</text>
+            </g>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <g>
+                <path fill="none" stroke="none"/>
+                <text fill="#000000" stroke="none" font-family="Arial" font-size="13px" font-style="normal" font-weight="bold" text-decoration="none" x="420.279541015625" y="15.5">sd</text>
+            </g>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <rect fill="#C0C0C0" stroke="none" x="583" y="47" width="72.69482421875" height="39" opacity="0.2"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <rect fill="#ffffff" stroke="none" x="576" y="40" width="72.69482421875" height="39"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 576 40 L 648.69482421875 40 L 648.69482421875 79 L 576 79 L 576 40 Z Z" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <g>
+                <path fill="none" stroke="none"/>
+                <text fill="#000000" stroke="none" font-family="Arial" font-size="18px" font-style="normal" font-weight="bold" text-decoration="none" x="590.836181640625" y="62">Alice</text>
+            </g>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 613.5 80 L 613.5 304" stroke-miterlimit="10" stroke-dasharray="3"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <rect fill="#C0C0C0" stroke="none" x="871" y="47" width="71.736328125" height="39" opacity="0.2"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <rect fill="#ffffff" stroke="none" x="864" y="40" width="71.736328125" height="39"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 864 40 L 935.736328125 40 L 935.736328125 79 L 864 79 L 864 40 Z Z" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <g>
+                <path fill="none" stroke="none"/>
+                <text fill="#000000" stroke="none" font-family="Arial" font-size="18px" font-style="normal" font-weight="bold" text-decoration="none" x="882.37353515625" y="62">Bob</text>
+            </g>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 900.5 80 L 900.5 304" stroke-miterlimit="10" stroke-dasharray="3"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="#ffffff" stroke="none" d="M 448 96 L 565 96 L 575 106 L 575 143 L 448 143 L 448 96"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 448 96 L 565 96 L 575 106 L 575 143 L 448 143 L 448 96 L 448 96" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 565 96 L 565 106 L 575 106 L 565 96" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <g>
+                <path fill="none" stroke="none"/>
+                <text fill="#000000" stroke="none" font-family="Arial" font-size="16px" font-style="normal" font-weight="normal" text-decoration="none" x="453" y="113">let a</text>
+            </g>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <g>
+                <path fill="none" stroke="none"/>
+                <text fill="#000000" stroke="none" font-family="Arial" font-size="16px" font-style="normal" font-weight="normal" text-decoration="none" x="453" y="131">let A = g^a % p</text>
+            </g>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="#ffffff" stroke="none" d="M 936 96 L 1061 96 L 1071 106 L 1071 143 L 936 143 L 936 96"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 936 96 L 1061 96 L 1071 106 L 1071 143 L 936 143 L 936 96 L 936 96" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 1061 96 L 1061 106 L 1071 106 L 1061 96" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <g>
+                <path fill="none" stroke="none"/>
+                <text fill="#000000" stroke="none" font-family="Arial" font-size="16px" font-style="normal" font-weight="normal" text-decoration="none" x="941" y="113">let b</text>
+            </g>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <g>
+                <path fill="none" stroke="none"/>
+                <text fill="#000000" stroke="none" font-family="Arial" font-size="16px" font-style="normal" font-weight="normal" text-decoration="none" x="941" y="131">let B = g^b % p</text>
+            </g>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="#ffffff" stroke="none" d="M 720 8 L 778 8 L 788 18 L 788 52 L 720 52 L 720 8"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 720 8 L 778 8 L 788 18 L 788 52 L 720 52 L 720 8 L 720 8" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 778 8 L 778 18 L 788 18 L 778 8" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <g>
+                <path fill="none" stroke="none"/>
+                <text fill="#000000" stroke="none" font-family="Arial" font-size="16px" font-style="normal" font-weight="normal" text-decoration="none" x="725" y="25">let g</text>
+            </g>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <g>
+                <path fill="none" stroke="none"/>
+                <text fill="#000000" stroke="none" font-family="Arial" font-size="16px" font-style="normal" font-weight="normal" text-decoration="none" x="725" y="43">let p</text>
+            </g>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="#ffffff" stroke="none" d="M 448 224 L 565 224 L 575 234 L 575 266 L 448 266 L 448 224"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 448 224 L 565 224 L 575 234 L 575 266 L 448 266 L 448 224 L 448 224" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 565 224 L 565 234 L 575 234 L 565 224" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <g>
+                <path fill="none" stroke="none"/>
+                <text fill="#000000" stroke="none" font-family="Arial" font-size="16px" font-style="normal" font-weight="normal" text-decoration="none" x="453" y="241">let s = B^a % p</text>
+            </g>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="#ffffff" stroke="none" d="M 936 224 L 1053 224 L 1063 234 L 1063 266 L 936 266 L 936 224"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 936 224 L 1053 224 L 1063 234 L 1063 266 L 936 266 L 936 224 L 936 224" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 1053 224 L 1053 234 L 1063 234 L 1053 224" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <g>
+                <path fill="none" stroke="none"/>
+                <text fill="#000000" stroke="none" font-family="Arial" font-size="16px" font-style="normal" font-weight="normal" text-decoration="none" x="941" y="241">let s = A^b % p</text>
+            </g>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 613 152 L 893 152" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="#000000" stroke="none" d="M 882.8373251423759 156.209517756016 L 893 152 L 882.8373251423758 147.790482243984"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 882.8373251423759 156.209517756016 L 893 152 L 882.8373251423758 147.790482243984 L 882.8373251423759 156.209517756016" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <g>
+                <path fill="none" stroke="none"/>
+                <text fill="#000000" stroke="none" font-family="Arial" font-size="16px" font-style="normal" font-weight="normal" text-decoration="none" x="736.069091796875" y="147.5">1 : A</text>
+            </g>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <rect fill="#ffffff" stroke="none" x="893" y="152" width="13" height="48"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 893 152 L 906 152 L 906 200 L 893 200 L 893 152 Z Z" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 900 200 L 619 200" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="#000000" stroke="none" d="M 629.1626748576241 195.790482243984 L 619 200 L 629.1626748576241 204.209517756016"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 629.1626748576241 195.790482243984 L 619 200 L 629.1626748576241 204.209517756016 L 629.1626748576241 195.790482243984" stroke-miterlimit="10"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <g>
+                <path fill="none" stroke="none"/>
+                <text fill="#000000" stroke="none" font-family="Arial" font-size="16px" font-style="normal" font-weight="normal" text-decoration="none" x="741.069091796875" y="215.5">2 : B</text>
+            </g>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <rect fill="#ffffff" stroke="none" x="606" y="200" width="13" height="40"/>
+        </g>
+        <g transform="translate(-406,10) scale(1,1)">
+            <path fill="none" stroke="#000000" d="M 606 200 L 619 200 L 619 240 L 606 240 L 606 200 Z Z" stroke-miterlimit="10"/>
+        </g>
+    </g>
+</svg>
