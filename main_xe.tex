@@ -1,9 +1,11 @@
 \documentclass[14pt]{report}
+\usepackage{fontspec}
 \usepackage[english,russian]{babel}
+\setmainfont{Times New Roman}
+
 \usepackage{cite}
 \usepackage{setspace}
 \usepackage[unicode, hidelinks]{hyperref}
-\usepackage[utf8]{inputenc}
 
 \usepackage{xcolor}
 \usepackage{amsmath}
@@ -36,23 +38,17 @@
 \usepackage{mathrsfs}
 \usepackage{amssymb}
 \usepackage{caption}
-%\usepackage[outputdir=output]{minted}
-\usepackage{minted}
 
-% figure caption type changed
 \captionsetup{labelsep=space}
 \addto\captionsrussian{\renewcommand{\figurename}{Рисунок}}
-% chapter settings
 \titleformat{\chapter}[display]   
 {\centering\Large\bfseries}{\chaptertitlename\ \thechapter}{10pt}{\Large}   
 \titlespacing*{\chapter}{5pt}{-20pt}{30pt}
 
-% section settings
 \titleformat{\section}[block]
   {\large\bfseries}
   {\thesection\ }{0pt}{}
 
-% settings for chapters and sections
 \addto\captionsrussian{% Replace "english" with the language you use
   \renewcommand{\contentsname}%
     {\centering \large ОГЛАВЛЕНИЕ}%
@@ -74,5 +70,3 @@
 \include{literature}
 \include{appendix}
 \end{document}
-
-\grid
