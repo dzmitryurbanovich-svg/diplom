@@ -1,7 +1,15 @@
 \chapter{Описание игры и целевая задача}
 
 \section{Правила и особенности игры Каркассон}
-Игра «Каркассон» (Carcassonne) является настольной стратегической игрой немецкого стиля (Eurogame), в которой игровой процесс строится на пошаговом выкладывании квадратов местности (тайлов) и размещении на них фишек подданных (миплов)~\cite{karna2012carcassonne}. 
+Игра «Каркассон» (Carcassonne) является настольной стратегической игрой немецкого стиля (Eurogame), в которой игровой процесс строится на пошаговом выкладывании квадратов местности (тайлов) и размещении на них фишек подданных (миплов)~\cite{karna2012carcassonne}. Пример игрового процесса представлен на рисунке~\ref{fig:rules}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{carcassonne_rules.jpeg}
+    \caption{Игровой процесс и выкладывание тайлов в Каркассоне}
+    \label{fig:rules}
+\end{figure}
+
 Игровое пространство формируется динамически в процессе игры. Каждый новый тайл должен быть выложен по правилам топологической связности: грани выкладываемого квадрата должны логически продолжать объекты на уже лежащих на столе квадратах (дорога должна соединяться с дорогой, город с городом, поле с полем).
 
 \section{Проблематика алгоритмического решения}
@@ -26,7 +34,7 @@
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.8\textwidth]{page_4_img_4.png}
+    \includegraphics[width=0.8\textwidth]{graph_repr.jpeg}
     \caption{Графовое представление игрового поля}
     \label{fig:graph_repr}
 \end{figure}
@@ -47,7 +55,7 @@
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.8\textwidth]{page_6_img_0.png}
+    \includegraphics[width=0.8\textwidth]{architecture_schema.jpeg}
     \caption{Схема архитектуры решения (Logic Layer и Strategy Layer)}
     \label{fig:arch_schema}
 \end{figure}
