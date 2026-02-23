@@ -220,7 +220,7 @@ starlette_app = Starlette(
     debug=True,
     routes=[
         Route("/sse", endpoint=handle_sse),
-        Mount("/messages", endpoint=sse.handle_post_message),
+        Route("/messages", endpoint=sse.handle_post_message, methods=["POST"]),
     ],
 )
 
