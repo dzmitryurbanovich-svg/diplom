@@ -55,11 +55,12 @@ class Board:
         self.segment_counter += 1
         return f"seg_{self.segment_counter}"
 
-    def is_legal_move(self, x: int, y: int, tile: Tile) -> bool:
-        """Checks if placing a tile at (x, y) is legal without performing the placement."""
+    def place_tile(self, x: int, y: int, tile: Tile) -> bool:
+        """Places a tile on the board if the move is legal."""
         if (x, y) in self.grid:
             return False
         
+        # Check adjacency and side matching
         adjacents = {
             Side.NORTH: (x, y + 1),
             Side.EAST: (x + 1, y),
@@ -79,19 +80,8 @@ class Board:
                     if tile.get_side_type(side) != neighbor.get_side_type(neighbor_side):
                         return False # Mismatch!
         
-        return has_adj
-
-    def place_tile(self, x: int, y: int, tile: Tile) -> bool:
-        """Places a tile on the board if the move is legal."""
-        if not self.is_legal_move(x, y, tile):
+        if not has_adj:
             return False
-
-        adjacents = {
-            Side.NORTH: (x, y + 1),
-            Side.EAST: (x + 1, y),
-            Side.SOUTH: (x, y - 1),
-            Side.WEST: (x - 1, y)
-        }
 
         # Register segments in DSU
         for segment in tile.segments:
