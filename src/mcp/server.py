@@ -44,9 +44,9 @@ async def handle_list_tools() -> list[types.Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "x": {"type": "integer"},
-                    "y": {"type": "integer"},
-                    "rotation": {"type": "integer", "enum": [0, 90, 180, 270]},
+                    "x": {"oneOf": [{"type": "integer"}, {"type": "string"}]},
+                    "y": {"oneOf": [{"type": "integer"}, {"type": "string"}]},
+                    "rotation": {"oneOf": [{"type": "integer"}, {"type": "string"}], "enum": [0, 90, 180, 270, "0", "90", "180", "270"]},
                     "tile_name": {"type": "string"}
                 },
                 "required": ["x", "y", "rotation", "tile_name"],
@@ -146,9 +146,13 @@ async def handle_call_tool(
         return [types.TextContent(type="text", text=f"Legal moves for {tile_name}: {legal_moves}")]
 
     elif name == "place_tile":
-        x = arguments.get("x")
-        y = arguments.get("y")
-        rot = arguments.get("rotation")
+        try:
+            x = int(arguments.get("x"))
+            y = int(arguments.get("y"))
+            rot = int(arguments.get("rotation"))
+        except (ValueError, TypeError):
+            return [types.TextContent(type="text", text="Error: Coordinates and rotation must be integers.")]
+            
         tile_name = arguments.get("tile_name")
         
         if tile_name not in DECK_DEFINITIONS:

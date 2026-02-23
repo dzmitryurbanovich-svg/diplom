@@ -6,7 +6,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL = "gemma3:latest"
+MODEL = "llama3.2"
 
 async def run_agent():
     # 1. Setup MCP Server connection parameters
@@ -47,16 +47,20 @@ async def run_agent():
 
             print("[*] Sending request to Ollama...")
             async with httpx.AsyncClient(timeout=60.0) as client:
+                payload = {
+                    "model": MODEL,
+                    "messages": messages,
+                    "tools": ollama_tools,
+                    "stream": False
+                }
+                
                 try:
                     response = await client.post(
                         OLLAMA_URL,
-                        json={
-                            "model": MODEL,
-                            "messages": messages,
-                            "tools": ollama_tools,
-                            "stream": False
-                        }
+                        json=payload
                     )
+                    if response.status_code != 200:
+                        print(f"[ERROR] Ollama returned {response.status_code}: {response.text}")
                     response.raise_for_status()
                     result = response.json()
                 except Exception as e:
