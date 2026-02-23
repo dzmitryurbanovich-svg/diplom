@@ -115,3 +115,38 @@ class Board:
             return False
         root = self.dsu[segment_type].find(segment_id)
         return self.dsu[segment_type].open_edges[root] == 0
+
+    def render_ascii(self) -> str:
+        """Returns an ASCII representation of the board."""
+        if not self.grid:
+            return "   (Empty Board)"
+        
+        min_x = min(x for x, y in self.grid.keys())
+        max_x = max(x for x, y in self.grid.keys())
+        min_y = min(y for x, y in self.grid.keys())
+        max_y = max(y for x, y in self.grid.keys())
+        
+        # Add padding
+        min_x -= 1
+        max_x += 1
+        min_y -= 1
+        max_y += 1
+        
+        output = []
+        # Header row (x-axis)
+        header = "   " + " ".join(f"{x:2}" for x in range(min_x, max_x + 1))
+        output.append(header)
+        output.append("   " + "-" * len(header))
+
+        for y in range(max_y, min_y - 1, -1):
+            row = [f"{y:2}|"]
+            for x in range(min_x, max_x + 1):
+                if (x, y) in self.grid:
+                    tile = self.grid[(x, y)]
+                    symbol = tile.name[0].upper() if tile.name else "?"
+                    row.append(f"[{symbol}]")
+                else:
+                    row.append(" . ")
+            output.append(" ".join(row))
+        
+        return "\n".join(output)

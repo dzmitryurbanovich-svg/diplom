@@ -109,12 +109,8 @@ async def handle_call_tool(
     global board
     
     if name == "get_board_state":
-        grid_desc = []
-        for (x, y), tile in board.grid.items():
-            grid_desc.append(f"({x}, {y}): {tile.name} (rot: {tile.rotation})")
-        
-        content = "Board state:\n" + ("\n".join(grid_desc) if grid_desc else "Empty")
-        return [types.TextContent(type="text", text=content)]
+        content = board.render_ascii()
+        return [types.TextContent(type="text", text=f"Current Board State:\n{content}")]
 
     elif name == "get_legal_moves":
         tile_name = arguments.get("tile_name")
