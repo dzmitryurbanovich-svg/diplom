@@ -38,6 +38,17 @@ PYTHONPATH=. venv/bin/python src/mcp/server.py
 PYTHONPATH=. venv/bin/python demos/ollama_agent.py
 ```
 
+## Развертывание в облако (Hugging Face Spaces)
+
+Для того чтобы сервер был доступен 24/7 по публичному URL:
+
+1.  Создайте новый **Space** на [Hugging Face](https://huggingface.co/spaces).
+2.  Выберите тип **Docker**.
+3.  Загрузите файлы проекта (или подключите GitHub-репозиторий).
+4.  После сборки ваш сервер будет доступен по адресу: `https://<your-username>-<space-name>.hf.space/sse`.
+
+Этот URL можно использовать в качестве "Remote MCP Server" в любых совместимых клиентах.
+
 ## Тестирование
 Для проверки корректности работы всех слоев используйте:
 ```bash

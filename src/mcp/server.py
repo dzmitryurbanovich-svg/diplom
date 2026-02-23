@@ -2,6 +2,10 @@ import asyncio
 from mcp.server.models import InitializationOptions
 from mcp.server import NotificationOptions, Server
 from mcp.server.stdio import stdio_server
+from mcp.server.sse import SseServerTransport
+from starlette.applications import Starlette
+from starlette.routing import Route, Mount
+from starlette.responses import JSONResponse
 import mcp.types as types
 
 from src.logic.engine import Board
@@ -175,7 +179,7 @@ async def handle_call_tool(
 
     raise ValueError(f"Unknown tool: {name}")
 
-async def main():
+async def main_stdio():
     async with stdio_server() as (read_stream, write_stream):
         await server.run(
             read_stream,
@@ -190,5 +194,40 @@ async def main():
             ),
         )
 
+# --- SSE / Web Server Implementation ---
+sse = SseServerTransport("/messages")
+
+async def handle_sse(request):
+    async with sse.connect_sse(request.scope, request.receive, request._send) as (
+        read_stream,
+        write_stream,
+    ):
+        await server.run(
+            read_stream,
+            write_stream,
+            InitializationOptions(
+                server_name="carcassonne",
+                server_version="0.1.0",
+                capabilities=server.get_capabilities(
+                    notification_options=NotificationOptions(),
+                    experimental_capabilities={},
+                ),
+            ),
+        )
+
+starlette_app = Starlette(
+    debug=True,
+    routes=[
+        Route("/sse", endpoint=handle_sse),
+        Mount("/messages", endpoint=sse.handle_post_message),
+    ],
+)
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "--sse":
+        import uvicorn
+        port = int(os.environ.get("PORT", 7860)) # Default HF port
+        uvicorn.run(starlette_app, host="0.0.0.0", port=port)
+    else:
+        asyncio.run(main_stdio())
