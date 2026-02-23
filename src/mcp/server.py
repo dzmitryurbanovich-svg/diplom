@@ -90,7 +90,7 @@ async def handle_get_prompt(
         return types.GetPromptResult(
             description="Strategic orientation for the current turn.",
             messages=[
-                types.SamplingMessage(
+                types.PromptMessage(
                     role="user",
                     content=types.TextContent(
                         type="text",
