@@ -116,7 +116,9 @@ class GameState:
     def __init__(self, p1_str="Greedy", p2_str="Star2.5", hf_token=""):
         self.board = Board()
         import random
-        self.deck = DECK_DEFINITIONS[:] # copy
+        import copy
+        # Deepcopy is strictly required to prevent segment ID and meeple player mutations leaking across games
+        self.deck = copy.deepcopy(DECK_DEFINITIONS)
         random.shuffle(self.deck)
         
         # Starter tile always at 0, 0
