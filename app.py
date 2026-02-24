@@ -312,4 +312,4 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
     demo.load(fn=reset_game, inputs=[token_input], outputs=[board_view, logs_view, stats_view])
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(server_name="0.0.0.0", server_port=7860)
