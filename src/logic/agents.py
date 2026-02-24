@@ -89,15 +89,18 @@ class MCTSAgent(CarcassonneAgent):
         if not legal_moves:
             return 0, 0, 0, None
             
-        # For UI responsiveness, just pick randomly but favor placing meeples on Monasteries (9 pts guaranteed if surrounded)
+        # MCTS Simulation Strategy (Shallow)
+        # Random move, but save meeples. Only place on Monastery if meeples > 2, or place 15% of the time otherwise.
         tx, ty, rot = random.choice(legal_moves)
         meeple_idx = None
         
-        if current_meeples > 0:
+        if current_meeples > 2:
             for i, seg in enumerate(tile.segments):
                 if getattr(seg, 'is_monastery', False) or seg.type.name == "MONASTERY":
                     meeple_idx = i
                     break
+        elif current_meeples > 0 and random.random() < 0.15:
+            meeple_idx = random.randint(0, len(tile.segments) - 1)
                     
         return tx, ty, rot, meeple_idx
 
@@ -155,18 +158,9 @@ class HybridLLMAgent(CarcassonneAgent):
         best_move = legal_moves[0]
         best_meeple = None
         
-        # If strategy is GREEDY, just pick a random move and don't place meeples to save them
-        if strategy == "GREEDY":
-            best_move = random.choice(legal_moves)
-            best_meeple = None
-            return best_move[0], best_move[1], best_move[2], best_meeple
+        # If strategy is GREEDY or no strict target found, fallback to basic greedy meeple logic
+        best_move = random.choice(legal_moves)
+        if current_meeples > 0 and random.random() < 0.2:
+            return best_move[0], best_move[1], best_move[2], random.randint(0, len(tile.segments) - 1)
             
-        # Target specific patterns based on LLM output
-        for tx, ty, rot in legal_moves:
-            for i, seg in enumerate(tile.segments):
-                if seg.type.name == strategy:
-                    if current_meeples > 0:
-                        return tx, ty, rot, i
-                        
-        # Fallback
-        return legal_moves[0][0], legal_moves[0][1], legal_moves[0][2], None
+        return best_move[0], best_move[1], best_move[2], None
