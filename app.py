@@ -279,7 +279,7 @@ def reset_game(token):
     _global_state = GameState()
     return _global_state.get_ui_state(token)
 
-with gr.Blocks(title="Carcassonne AI Tournament Viewer", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
     gr.Markdown("# 🏰 Carcassonne AI Tournament Engine")
     gr.Markdown("Watch entirely autonomous agents compete in the classic board game, applying heuristic tree search and LLM-driven strategy.")
     

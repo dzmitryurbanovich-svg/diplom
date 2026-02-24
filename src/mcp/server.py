@@ -11,7 +11,7 @@ from starlette.responses import JSONResponse
 import mcp.types as types
 
 from src.logic.engine import Board
-from src.logic.deck import DECK_DEFINITIONS, create_starter_tile
+from src.logic.deck import DECK_DEFINITIONS
 from src.logic.models import Side, Tile, TileSegment, SegmentType
 from src.mcp.prompts import SYSTEM_PROMPT, TOT_PROMPT_TEMPLATE
 
