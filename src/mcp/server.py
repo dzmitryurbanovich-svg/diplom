@@ -66,6 +66,28 @@ async def handle_list_tools() -> list[types.Tool]:
                 "properties": {},
             },
         ),
+        types.Tool(
+            name="calculate_score",
+            description="Calculates the Carcassonne score for all players at end of game.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "scores": {
+                        "type": "object",
+                        "description": "Dict of player_name -> tiles_placed"
+                    }
+                },
+                "required": ["scores"],
+            },
+        ),
+        types.Tool(
+            name="reset_board",
+            description="Resets the game board to its initial empty state. Call this before starting a new tournament.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
     ]
 
 @server.list_prompts()
@@ -181,6 +203,56 @@ async def handle_call_tool(
         report += "Focus: Look for opportunities to complete cities for points or use roads to block opponent expansion."
         
         return [types.TextContent(type="text", text=report)]
+
+    elif name == "calculate_score":
+        # Carcassonne scoring rules:
+        # Completed city: 2 pts per tile + 2 per pennant
+        # Incomplete city (at game end): 1 pt per tile + 1 per pennant
+        # Completed road: 1 pt per tile
+        # Incomplete road: 1 pt per tile
+        total_tiles = len(board.grid)
+
+        # Count cities and roads in DSU
+        city_dsu = board.dsu.get(SegmentType.CITY)
+        road_dsu = board.dsu.get(SegmentType.ROAD)
+
+        city_points = 0
+        road_points = 0
+
+        if city_dsu:
+            seen_city_roots = set()
+            for seg_id in city_dsu.parent:
+                root = city_dsu.find(seg_id)
+                if root not in seen_city_roots:
+                    seen_city_roots.add(root)
+                    size = city_dsu.size.get(root, 1)
+                    pennants = city_dsu.pennants.get(root, 0)
+                    open_edges = city_dsu.open_edges.get(root, 1)
+                    is_complete = (open_edges == 0)
+                    pts_per_tile = 2 if is_complete else 1
+                    city_points += (size + pennants) * pts_per_tile
+
+        if road_dsu:
+            seen_road_roots = set()
+            for seg_id in road_dsu.parent:
+                root = road_dsu.find(seg_id)
+                if root not in seen_road_roots:
+                    seen_road_roots.add(root)
+                    size = road_dsu.size.get(root, 1)
+                    road_points += size  # 1 pt per tile always
+
+        total_score = city_points + road_points
+        result = {
+            "total_tiles_placed": total_tiles,
+            "city_points": city_points,
+            "road_points": road_points,
+            "total_points": total_score
+        }
+        return [types.TextContent(type="text", text=json.dumps(result))]
+
+    elif name == "reset_board":
+        board = Board()
+        return [types.TextContent(type="text", text="Board reset successfully.")]
 
     raise ValueError(f"Unknown tool: {name}")
 

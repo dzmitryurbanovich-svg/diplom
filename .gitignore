@@ -24,3 +24,7 @@ thesis/*.synctex.gz
 extracted_images/
 *.pdf_images
 texput.log
+
+# Build artifacts
+deployment_package/
+deployment_package.zip
