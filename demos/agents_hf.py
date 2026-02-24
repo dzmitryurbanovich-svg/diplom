@@ -13,10 +13,14 @@ HF_TOKEN = os.environ.get("HF_TOKEN", "")
 class HFAgent(BaseAgent):
     def __init__(self, name, session: ClientSession):
         super().__init__(name, session)
-        self.headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+        self.headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN.strip() else {}
 
     async def get_strategic_goal(self):
         """Ask the HF Inference API for a strategic keyword: CITY, ROAD, or GREEDY."""
+        if not self.headers:
+            print(f"[HF WARNING] HF_TOKEN is not set! Export HF_TOKEN=hf_... to enable the LLM strategy. Defaulting to GREEDY.")
+            return "GREEDY"
+
         board_state = await self.session.call_tool("get_board_state", {})
         context = await self.session.call_tool("get_strategic_context", {})
 

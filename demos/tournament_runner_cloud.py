@@ -1,12 +1,21 @@
 import asyncio
 import json
+import os
+import sys
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from demos.agents_baseline import GreedyAgent
 from demos.agents_hf import HFAgent
 
 # Your Hugging Face Space SSE URL
-HF_SPACE_URL = "https://dzmitro-carcassonne-ai.hf.space/sse"
+if not os.environ.get("HF_TOKEN"):
+    print("\n[ERROR] HF_TOKEN environment variable is not set!")
+    print("Please export your Hugging Face API token before running the tournament:")
+    print("  export HF_TOKEN='your_hf_token_here'")
+    print("You can generate a token at https://huggingface.co/settings/tokens\n")
+    sys.exit(1)
+
+HF_SPACE_URL = os.environ.get("HF_SPACE_URL", "https://dzmitro-carcassonne-ai.hf.space/sse")
 
 async def run_tournament():
     print(f"[*] Connecting to Cloud MCP Server: {HF_SPACE_URL}...")

@@ -4,8 +4,47 @@ import urllib.parse
 from src.logic.engine import Board
 from src.logic.deck import DECK_DEFINITIONS
 
+import base64
+import os
+
+ASSETS_CACHE = {}
+
+def load_assets():
+    tiles_dir = "assets/tiles"
+    base_names = "ABCDEFGHIJKLMNOPQRSTUVWX"
+    for letter in base_names:
+        path = f"{tiles_dir}/Base_Game_C3_Tile_{letter}.png"
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                ASSETS_CACHE[letter] = f"data:image/png;base64,{base64.b64encode(f.read()).decode('utf-8')}"
+                
+    meeples_dir = "assets/meeples"
+    red_path = f"{meeples_dir}/red_meeple.png"
+    if os.path.exists(red_path):
+        with open(red_path, "rb") as f:
+            ASSETS_CACHE["Player1_Meeple"] = f"data:image/png;base64,{base64.b64encode(f.read()).decode('utf-8')}"
+    
+    blue_path = f"{meeples_dir}/blue_meeple.jpg"
+    if os.path.exists(blue_path):
+        with open(blue_path, "rb") as f:
+            ASSETS_CACHE["Player2_Meeple"] = f"data:image/jpeg;base64,{base64.b64encode(f.read()).decode('utf-8')}"
+
+load_assets()
+
+TILE_LETTER_MAP = {
+    "Monastery_Road": "A", "Monastery_Field": "B", "City4_Shield": "C",
+    "City1_RoadStraight": "D", "City1_Fields": "E", "City2_Opposite_Shield": "F",
+    "City2_Opposite": "G", "City2_Curve": "H", "City2_Curve_Shield": "I",
+    "City1_RoadCurve": "J", "City1_RoadCurve_Mirror": "K", "City2_Curve_Road": "L",
+    "City2_Curve_Road_Shield": "M", "City2_Curve_Road_NoShield": "N",
+    "City1_RoadStraight_Shield": "O", "Crossroad": "P", "TJunction": "Q",
+    "RoadStraight": "R", "RoadCurve": "S", "City3": "T", "City3_Shield": "U",
+    "City3_Road": "V", "City3_Road_Shield": "W", "CityOpposite_Road": "X",
+    "Starter": "D", "CityAdj": "H"
+}
+
 class SVG_Renderer:
-    """Generates an SVG map representation of the Carcassonne board state."""
+    """Generates an SVG map representation of the Carcassonne board state using real image assets."""
     
     TILE_SIZE = 100
     
@@ -37,80 +76,73 @@ class SVG_Renderer:
     @classmethod
     def render_tile(cls, tile, px, py) -> str:
         s = cls.TILE_SIZE
-        cx, cy = px + s/2, py + s/2
         
-        # Base field background
         g = [f'<g transform="translate({px}, {py})">']
-        g.append(f'<rect width="{s}" height="{s}" fill="#a7c957" stroke="#6b903e" stroke-width="1"/>')
         
-        from src.logic.models import Side, SegmentType
+        letter = TILE_LETTER_MAP.get(tile.name, "D")
+        b64_img = ASSETS_CACHE.get(letter)
         
-        road_paths = []
-        city_polygons = []
-        
-        for seg in tile.segments:
-            # Render Cities
-            if seg.type == SegmentType.CITY:
-                if len(seg.sides) == 4:
-                    city_polygons.append(f'<rect x="0" y="0" width="{s}" height="{s}" fill="#d4a373" stroke="#8b5a2b" stroke-width="4"/>')
-                elif len(seg.sides) == 1:
-                    if Side.NORTH in seg.sides:
-                        city_polygons.append(f'<path d="M 0 0 L {s} 0 L {s} {s/3} Q {s/2} {s/2} 0 {s/3} Z" fill="#d4a373" stroke="#8b5a2b" stroke-width="2"/>')
-                    elif Side.SOUTH in seg.sides:
-                        city_polygons.append(f'<path d="M 0 {s} L {s} {s} L {s} {s*2/3} Q {s/2} {s/2} 0 {s*2/3} Z" fill="#d4a373" stroke="#8b5a2b" stroke-width="2"/>')
-                    elif Side.EAST in seg.sides:
-                        city_polygons.append(f'<path d="M {s} 0 L {s} {s} L {s*2/3} {s} Q {s/2} {s/2} {s*2/3} 0 Z" fill="#d4a373" stroke="#8b5a2b" stroke-width="2"/>')
-                    elif Side.WEST in seg.sides:
-                        city_polygons.append(f'<path d="M 0 0 L 0 {s} L {s/3} {s} Q {s/2} {s/2} {s/3} 0 Z" fill="#d4a373" stroke="#8b5a2b" stroke-width="2"/>')
-                elif len(seg.sides) == 2:
-                    if Side.NORTH in seg.sides and Side.EAST in seg.sides:
-                        city_polygons.append(f'<path d="M 0 0 L {s} 0 L {s} {s} Q {s/2} {s/2} 0 0 Z" fill="#d4a373" stroke="#8b5a2b" stroke-width="2"/>')
-                    # Other 2-side cities follow similar radial or corner sweeping logic
-                    else:
-                        city_polygons.append(f'<rect x="{s/4}" y="{s/4}" width="{s/2}" height="{s/2}" fill="#d4a373" stroke="#8b5a2b" stroke-width="2"/>') # Fallback
-
-            # Render Roads
-            elif seg.type == SegmentType.ROAD:
-                if len(seg.sides) == 2:
-                    start_pt, end_pt = "", ""
-                    pts = {Side.NORTH: f"{s/2},0", Side.SOUTH: f"{s/2},{s}", Side.EAST: f"{s},{s/2}", Side.WEST: f"0,{s/2}"}
-                    paths = [pts.get(side) for side in seg.sides if side in pts]
-                    if len(paths) == 2:
-                        road_paths.append(f'<path d="M {paths[0]} Q {s/2},{s/2} {paths[1]}" fill="none" stroke="#e0e0e0" stroke-width="12"/>')
-                elif len(seg.sides) == 1:
-                    pts = {Side.NORTH: f"{s/2},0", Side.SOUTH: f"{s/2},{s}", Side.EAST: f"{s},{s/2}", Side.WEST: f"0,{s/2}"}
-                    for side in seg.sides:
-                        road_paths.append(f'<line x1="{s/2}" y1="{s/2}" x2="{pts[side].split(",")[0]}" y2="{pts[side].split(",")[1]}" stroke="#e0e0e0" stroke-width="12"/>')
-
-        # Add all layers in order
-        g.extend(city_polygons)
-        g.extend(road_paths)
-
-        # Monastery / Center logic
-        if tile.center_type == SegmentType.MONASTERY:
-            g.append(f'<circle cx="{s/2}" cy="{s/2}" r="{s/4}" fill="#bc4749" stroke="#fff" stroke-width="2"/>')
-            g.append(f'<rect x="{s/2-s/8}" y="{s/2-s/8}" width="{s/4}" height="{s/4}" fill="#fff"/>')
+        if b64_img:
+            # SVG rotate is clockwise. We rotate the image precisely around the tile center (s/2, s/2)
+            rot = tile.rotation 
+            g.append(f'<image href="{b64_img}" width="{s}" height="{s}" transform="rotate({rot} {s/2} {s/2})"/>')
+        else:
+            g.append(f'<rect width="{s}" height="{s}" fill="#ccc" stroke="#333"/>')
             
-        # Draw pennants
-        for seg in tile.segments:
-            if seg.has_pennant:
-                g.append(f'<polygon points="{s/4},{s/4} {s/4+10},{s/4} {s/4+5},{s/4+15}" fill="#457b9d"/>')
-                
         # Draw Meeples
-        # For simplicity, if we have meeples on segments, draw them generally near their feature
         for i, seg in enumerate(tile.segments):
             if seg.meeple_player:
-                color = "#e63946" if seg.meeple_player == "Player1" else "#1d3557"
-                # Offset positions to not overlap
-                ox = s/2 + (i * 5 - 10)
-                oy = s/2 + (i * 5 - 10)
-                g.append(f'<circle cx="{ox}" cy="{oy}" r="6" fill="{color}" stroke="#fff" stroke-width="2"/>')
+                meeple_img = ASSETS_CACHE.get(f"{seg.meeple_player}_Meeple")
+                # Add some semi-random offset so meeples aren't perfectly dead center every single time
+                ox = s/2 + (i * 8 - 12) - 15  # -15 to center the 30x30 meeple
+                oy = s/2 + (i * 8 - 12) - 15
+                if meeple_img:
+                    g.append(f'<image href="{meeple_img}" x="{ox}" y="{oy}" width="30" height="30"/>')
+                else:
+                    color = "#e63946" if seg.meeple_player == "Player1" else "#1d3557"
+                    g.append(f'<circle cx="{ox+15}" cy="{oy+15}" r="6" fill="{color}" stroke="#fff" stroke-width="2"/>')
                 
-        # Draw coordinate label 
-        # g.append(f'<text x="5" y="15" font-size="10" fill="gray">{tile.name[:4]}</text>')
 
         g.append('</g>')
         return "\n".join(g)
+
+import os
+import httpx
+import asyncio
+
+# --- Standalone HF LLM Connector for UI ---
+HF_API_URL = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct"
+
+def get_llm_strategy(board_state_text: str, hf_token: str) -> str:
+    if not hf_token.strip(): return "GREEDY"
+    headers = {"Authorization": f"Bearer {hf_token.strip()}"}
+    prompt = (
+        f"<s>[INST] You are a Carcassonne AI. Read the board, then reply with exactly one word.\n\n"
+        f"Board:\n{board_state_text}\n\n"
+        f"Choose your strategy:\n"
+        f"  CITY  - extend/complete a city for 2 pts/tile\n"
+        f"  ROAD  - build roads for 1 pt/tile\n"
+        f"  GREEDY - take any legal placement\n\n"
+        f"Reply with ONE word only (CITY, ROAD, or GREEDY): [/INST]"
+    )
+    payload = {
+        "inputs": prompt,
+        "parameters": {"return_full_text": False, "max_new_tokens": 5, "stop": ["\n", " "]}
+    }
+    
+    try:
+        # For Gradio Sync UI, we can use httpx standard sync client
+        response = httpx.post(HF_API_URL, headers=headers, json=payload, timeout=30.0)
+        result = response.json()
+        if isinstance(result, list): text = result[0].get('generated_text', '').strip().upper()
+        else: text = result.get('generated_text', '').strip().upper()
+        
+        for k in ["CITY", "ROAD", "GREEDY"]:
+            if k in text: return k
+        return "GREEDY"
+    except Exception as e:
+        print(f"UI LLM Error: {e}")
+        return "GREEDY"
 
 # Simple game orchestrator for the Gradio UI
 class GameState:
@@ -131,24 +163,44 @@ class GameState:
         self.current_player = "Player1"
         self.game_over = False
 
-    def play_turn(self):
+    def play_turn(self, hf_token: str = ""):
         if not self.deck or self.game_over:
-            self.game_over = True
-            
-            # End game scoring
-            final_scores = self.board.calculate_final_scores()
-            for score in final_scores:
-                for player, count in score["meeples"].items():
-                    # If multiple players tie, they all get pts.
-                    self.scores[player] += score["points"]
-            
-            self.logs.append(f"<b>[GAME OVER]</b> Final Scoring computed.")
-            return self.get_ui_state()
+            if not self.game_over:
+                self.game_over = True
+                
+                # End game scoring
+                final_scores = self.board.calculate_final_scores()
+                for score in final_scores:
+                    for player, count in score["meeples"].items():
+                        # If multiple players tie, they all get pts.
+                        self.scores[player] += score["points"]
+                
+                self.logs.append(f"<b>[GAME OVER]</b> Final Scoring computed.")
+                
+                # Announce Winner
+                p1_score = self.scores["Player1"]
+                p2_score = self.scores["Player2"]
+                if p1_score > p2_score:
+                    self.logs.append(f"🏆 <b>Winner is Player 1 ({p1_score} vs {p2_score})!</b>")
+                elif p2_score > p1_score:
+                    self.logs.append(f"🏆 <b>Winner is Player 2 ({p2_score} vs {p1_score})!</b>")
+                else:
+                    self.logs.append(f"🤝 <b>It's a TIE ({p1_score} vs {p2_score})!</b>")
+                    
+            return self.get_ui_state(hf_token)
             
         tile = self.deck.pop(0)
         
-        # Basic Heuristic Agent Logic (Mocking LLM for UI speed, or we can use the real one)
-        # Using a Greedy logic to find a placement
+        # Decide Strategy based on Agent type
+        strategy = "GREEDY"
+        agent2_type = "Cloud_General (LLM)" if hf_token.strip() else "Greedy (No Token)"
+        
+        if self.current_player == "Player2" and agent2_type == "Cloud_General (LLM)":
+            board_txt = self.board.render_ascii()
+            strategy = get_llm_strategy(board_txt, hf_token)
+            self.logs.append(f"🤖 <b>[LLM THINKING]</b> {self.current_player} selected strategy: <b>{strategy}</b>")
+        
+        # Basic Heuristic Executer
         legal_moves = []
         to_check = set()
         for (x, y) in self.board.grid:
@@ -194,19 +246,22 @@ class GameState:
 
         # Switch player
         self.current_player = "Player2" if self.current_player == "Player1" else "Player1"
-        return self.get_ui_state()
+        return self.get_ui_state(hf_token)
 
-    def get_ui_state(self):
+    def get_ui_state(self, hf_token: str = ""):
         log_html = "<div style='height:400px; overflow-y:auto; font-family:monospace; background:#f4f4f4; padding:10px; border-radius:5px; border: 1px solid #ddd;'>"
         log_html += "<br>".join(reversed(self.logs))
         log_html += "</div>"
         
         svg = SVG_Renderer.render_board(self.board)
         
+        agent1 = "Greedy"
+        agent2 = "Cloud_General (LLM)" if hf_token.strip() else "Greedy (No Token)"
+        
         stats = f"""
         ### 📊 Current Score
-        - 🔴 **Player 1:** {self.scores['Player1']} pts *(Meeples: {self.meeples['Player1']}/7)*
-        - 🔵 **Player 2:** {self.scores['Player2']} pts *(Meeples: {self.meeples['Player2']}/7)*
+        - 🔴 **Player 1** ({agent1}): {self.scores['Player1']} pts *(Meeples: {self.meeples['Player1']}/7)*
+        - 🔵 **Player 2** ({agent2}): {self.scores['Player2']} pts *(Meeples: {self.meeples['Player2']}/7)*
         
         **Tiles remaining:** {len(self.deck)}/72
         **Current Turn:** {self.current_player}
@@ -216,13 +271,13 @@ class GameState:
 
 _global_state = GameState()
 
-def step_game():
-    return _global_state.play_turn()
+def step_game(token):
+    return _global_state.play_turn(token)
 
-def reset_game():
+def reset_game(token):
     global _global_state
     _global_state = GameState()
-    return _global_state.get_ui_state()
+    return _global_state.get_ui_state(token)
 
 with gr.Blocks(title="Carcassonne AI Tournament Viewer", theme=gr.themes.Soft()) as demo:
     gr.Markdown("# 🏰 Carcassonne AI Tournament Engine")
@@ -232,6 +287,7 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer", theme=gr.themes.Soft())
         with gr.Column(scale=2):
             board_view = gr.HTML(value="")
         with gr.Column(scale=1):
+            token_input = gr.Textbox(label="Hugging Face Token (for AI)", type="password", placeholder="hf_...", value=os.environ.get("HF_TOKEN", ""))
             stats_view = gr.Markdown(value="Hit start to begin.")
             controls = gr.Row()
             with controls:
@@ -241,19 +297,19 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer", theme=gr.themes.Soft())
             
             logs_view = gr.HTML(value="Logs will appear here.")
             
-    btn_step.click(fn=step_game, outputs=[board_view, logs_view, stats_view])
-    btn_reset.click(fn=reset_game, outputs=[board_view, logs_view, stats_view])
+    btn_step.click(fn=step_game, inputs=[token_input], outputs=[board_view, logs_view, stats_view])
+    btn_reset.click(fn=reset_game, inputs=[token_input], outputs=[board_view, logs_view, stats_view])
     
-    def auto_play_10():
+    def auto_play_10(token):
         for _ in range(10):
-            r1, r2, r3 = _global_state.play_turn()
+            r1, r2, r3 = _global_state.play_turn(token)
             if _global_state.game_over: break
         return r1, r2, r3
         
-    btn_auto.click(fn=auto_play_10, outputs=[board_view, logs_view, stats_view])
+    btn_auto.click(fn=auto_play_10, inputs=[token_input], outputs=[board_view, logs_view, stats_view])
     
     # Init
-    demo.load(fn=reset_game, outputs=[board_view, logs_view, stats_view])
+    demo.load(fn=reset_game, inputs=[token_input], outputs=[board_view, logs_view, stats_view])
 
 if __name__ == "__main__":
     demo.launch()
