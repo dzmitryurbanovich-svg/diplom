@@ -14,16 +14,17 @@ class Side(Enum):
     WEST = 3
 
 class TileSegment:
-    """Represents a part of a tile (e.g., a specific city fragment)."""
+    """Represents a part of a tile (e.g., a specific city fragment, road, or field)."""
     def __init__(self, segment_type: SegmentType, sides: List[Side], has_pennant: bool = False, is_monastery: bool = False):
         self.type = segment_type
         self.sides = sides
         self.has_pennant = has_pennant
         self.is_monastery = is_monastery
         self.id = None  # To be assigned by the board/DSU
+        self.meeple_player: Optional[str] = None  # Which player owns the meeple on this segment
 
     def __repr__(self):
-        return f"Segment({self.type.name}, sides={self.sides})"
+        return f"Segment({self.type.name}, sides={self.sides}, meeple={self.meeple_player})"
 
 class Tile:
     """Represents a single square tile in the game."""

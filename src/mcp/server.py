@@ -68,16 +68,10 @@ async def handle_list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="calculate_score",
-            description="Calculates the Carcassonne score for all players at end of game.",
+            description="Calculates endgame scores for fields and incomplete features.",
             inputSchema={
                 "type": "object",
-                "properties": {
-                    "scores": {
-                        "type": "object",
-                        "description": "Dict of player_name -> tiles_placed"
-                    }
-                },
-                "required": ["scores"],
+                "properties": {},
             },
         ),
         types.Tool(
@@ -87,6 +81,28 @@ async def handle_list_tools() -> list[types.Tool]:
                 "type": "object",
                 "properties": {},
             },
+        ),
+        types.Tool(
+            name="place_meeple",
+            description="Places a meeple on a specific segment of the tile at (x, y).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "x": {"type": "integer"},
+                    "y": {"type": "integer"},
+                    "segment_index": {"type": "integer"},
+                    "player_name": {"type": "string"}
+                },
+                "required": ["x", "y", "segment_index", "player_name"]
+            }
+        ),
+        types.Tool(
+            name="get_completed_features",
+            description="Extracts completed features, scores them, and frees meeples. Should be called after each turn.",
+            inputSchema={
+                "type": "object",
+                "properties": {}
+            }
         ),
     ]
 
@@ -204,51 +220,28 @@ async def handle_call_tool(
         
         return [types.TextContent(type="text", text=report)]
 
+    elif name == "place_meeple":
+        try:
+            x = int(arguments.get("x"))
+            y = int(arguments.get("y"))
+            seg_idx = int(arguments.get("segment_index"))
+            player = arguments.get("player_name")
+        except (ValueError, TypeError):
+            return [types.TextContent(type="text", text="Error: Invalid arguments.")]
+            
+        success = board.place_meeple(x, y, seg_idx, player)
+        if success:
+            return [types.TextContent(type="text", text=f"Success: Meeple placed by {player} on segment {seg_idx}.")]
+        return [types.TextContent(type="text", text="Error: Cannot place meeple here (already claimed or invalid).")]
+
+    elif name == "get_completed_features":
+        completed = board.get_completed_features()
+        return [types.TextContent(type="text", text=json.dumps(completed))]
+
     elif name == "calculate_score":
-        # Carcassonne scoring rules:
-        # Completed city: 2 pts per tile + 2 per pennant
-        # Incomplete city (at game end): 1 pt per tile + 1 per pennant
-        # Completed road: 1 pt per tile
-        # Incomplete road: 1 pt per tile
-        total_tiles = len(board.grid)
-
-        # Count cities and roads in DSU
-        city_dsu = board.dsu.get(SegmentType.CITY)
-        road_dsu = board.dsu.get(SegmentType.ROAD)
-
-        city_points = 0
-        road_points = 0
-
-        if city_dsu:
-            seen_city_roots = set()
-            for seg_id in city_dsu.parent:
-                root = city_dsu.find(seg_id)
-                if root not in seen_city_roots:
-                    seen_city_roots.add(root)
-                    size = city_dsu.size.get(root, 1)
-                    pennants = city_dsu.pennants.get(root, 0)
-                    open_edges = city_dsu.open_edges.get(root, 1)
-                    is_complete = (open_edges == 0)
-                    pts_per_tile = 2 if is_complete else 1
-                    city_points += (size + pennants) * pts_per_tile
-
-        if road_dsu:
-            seen_road_roots = set()
-            for seg_id in road_dsu.parent:
-                root = road_dsu.find(seg_id)
-                if root not in seen_road_roots:
-                    seen_road_roots.add(root)
-                    size = road_dsu.size.get(root, 1)
-                    road_points += size  # 1 pt per tile always
-
-        total_score = city_points + road_points
-        result = {
-            "total_tiles_placed": total_tiles,
-            "city_points": city_points,
-            "road_points": road_points,
-            "total_points": total_score
-        }
-        return [types.TextContent(type="text", text=json.dumps(result))]
+        # Returns the final endgame logic for fields and incomplete cities/roads/cloisters
+        final_scores = board.calculate_final_scores()
+        return [types.TextContent(type="text", text=json.dumps(final_scores))]
 
     elif name == "reset_board":
         board = Board()

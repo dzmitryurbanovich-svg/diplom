@@ -8,6 +8,7 @@ class DSU:
         self.size = {}
         self.pennants = {}
         self.open_edges = {}  # Number of edges waiting for connection
+        self.meeples = {}     # Dict tracking player_name: count of meeples in this set
 
     def make_set(self, segment_id: str, pennants: int = 0, open_edges: int = 0):
         if segment_id not in self.parent:
@@ -15,6 +16,7 @@ class DSU:
             self.size[segment_id] = 1
             self.pennants[segment_id] = pennants
             self.open_edges[segment_id] = open_edges
+            self.meeples[segment_id] = {}
 
     def find(self, i):
         if self.parent[i] == i:
@@ -32,6 +34,10 @@ class DSU:
             self.parent[root_j] = root_i
             self.size[root_i] += self.size[root_j]
             self.pennants[root_i] += self.pennants[root_j]
+            # Merge meeples
+            for p, count in self.meeples[root_j].items():
+                self.meeples[root_i][p] = self.meeples[root_i].get(p, 0) + count
+            
             # When connecting two segments, we satisfy 2 open edges
             self.open_edges[root_i] = self.open_edges[root_i] + self.open_edges[root_j] - 2
             return True
@@ -49,6 +55,7 @@ class Board:
             SegmentType.ROAD: DSU(),
             SegmentType.FIELD: DSU()
         }
+        self.monasteries: Dict[Tuple[int, int], Optional[str]] = {}  # Track (x, y) -> player who owns meeple
         self.segment_counter = 0
 
     def _get_next_segment_id(self) -> str:
@@ -117,6 +124,44 @@ class Board:
                         self.dsu[seg_this.type].union(seg_this.id, seg_neigh.id)
 
         self.grid[(x, y)] = tile
+        
+        # Check if tile has a monastery
+        for segment in tile.segments:
+            if getattr(segment, 'is_monastery', False) or segment.type == SegmentType.MONASTERY:
+                self.monasteries[(x, y)] = None  # Track monastery position
+                
+        return True
+
+    def place_meeple(self, x: int, y: int, segment_index: int, player_name: str) -> bool:
+        """Places a meeple on a specific segment of a tile if the feature is unoccupied."""
+        if (x, y) not in self.grid:
+            return False
+            
+        tile = self.grid[(x, y)]
+        if segment_index < 0 or segment_index >= len(tile.segments):
+            return False
+            
+        segment = tile.segments[segment_index]
+        if getattr(segment, 'meeple_player', None) is not None:
+            return False
+            
+        # Handle Monastery specially
+        if getattr(segment, 'is_monastery', False) or segment.type == SegmentType.MONASTERY:
+            if self.monasteries.get((x, y)) is not None:
+                return False
+            self.monasteries[(x, y)] = player_name
+            segment.meeple_player = player_name
+            return True
+            
+        if segment.type not in self.dsu:
+            return False
+            
+        root = self.dsu[segment.type].find(segment.id)
+        if len(self.dsu[segment.type].meeples.get(root, {})) > 0:
+            return False # Feature already claimed
+            
+        self.dsu[segment.type].meeples[root][player_name] = 1
+        segment.meeple_player = player_name
         return True
 
     def is_completed(self, segment_id: str, segment_type: SegmentType) -> bool:
@@ -125,6 +170,108 @@ class Board:
             return False
         root = self.dsu[segment_type].find(segment_id)
         return self.dsu[segment_type].open_edges[root] == 0
+
+    def get_completed_features(self) -> List[Dict]:
+        """Finds completed features, scores them, and removes meeples to return to players."""
+        completed = []
+        
+        # Check standard DSU features
+        for seg_type in [SegmentType.CITY, SegmentType.ROAD]:
+            dsu = self.dsu[seg_type]
+            for root, edges in list(dsu.open_edges.items()):
+                if edges == 0 and len(dsu.meeples.get(root, {})) > 0:
+                    # Score it
+                    pts_per_tile = 2 if seg_type == SegmentType.CITY else 1
+                    pts = (dsu.size[root] + dsu.pennants[root]) * pts_per_tile
+                    
+                    completed.append({
+                        "type": seg_type.name,
+                        "points": pts,
+                        "meeples": dict(dsu.meeples[root])
+                    })
+                    # Return meeples
+                    dsu.meeples[root] = {}
+
+        # Check monasteries
+        for (mx, my), owner in list(self.monasteries.items()):
+            if owner is not None:
+                # Count surrounding tiles
+                count = 0
+                for dx in [-1, 0, 1]:
+                    for dy in [-1, 0, 1]:
+                        if (mx + dx, my + dy) in self.grid:
+                            count += 1
+                if count == 9:
+                    completed.append({
+                        "type": "MONASTERY",
+                        "points": 9,
+                        "meeples": {owner: 1}
+                    })
+                    # Return meeple
+                    self.monasteries[(mx, my)] = None
+                    
+        return completed
+
+    def calculate_final_scores(self) -> List[Dict]:
+        """Scores all incomplete features and fields at the end of the game."""
+        results = []
+        
+        # Incomplete Cities (1pt/tile) and Roads (1pt/tile)
+        for seg_type in [SegmentType.CITY, SegmentType.ROAD]:
+            dsu = self.dsu[seg_type]
+            for root, edges in list(dsu.open_edges.items()):
+                if edges > 0 and len(dsu.meeples.get(root, {})) > 0:
+                    pts = (dsu.size[root] + dsu.pennants[root]) * 1 # 1 pt for incomplete
+                    results.append({
+                        "type": f"INCOMPLETE_{seg_type.name}",
+                        "points": pts,
+                        "meeples": dict(dsu.meeples[root])
+                    })
+
+        # Incomplete Monasteries
+        for (mx, my), owner in list(self.monasteries.items()):
+            if owner is not None:
+                count = sum(1 for dx in [-1,0,1] for dy in [-1,0,1] if (mx+dx, my+dy) in self.grid)
+                results.append({
+                    "type": "INCOMPLETE_MONASTERY",
+                    "points": count,
+                    "meeples": {owner: 1}
+                })
+
+        # Fields (3 pts per completed city bordering the field)
+        field_dsu = self.dsu[SegmentType.FIELD]
+        city_dsu = self.dsu[SegmentType.CITY]
+        
+        # Map each field root to the set of completed city roots it touches
+        field_to_cities = {root: set() for root in field_dsu.meeples.keys() if len(field_dsu.meeples[root]) > 0}
+        
+        for (x, y), tile in self.grid.items():
+            field_roots = set()
+            city_roots = set()
+            for seg in tile.segments:
+                if seg.type == SegmentType.FIELD:
+                    r = field_dsu.find(seg.id)
+                    if r in field_to_cities:
+                        field_roots.add(r)
+                elif seg.type == SegmentType.CITY:
+                    r = city_dsu.find(seg.id)
+                    if city_dsu.open_edges[r] == 0: # Must be completed city
+                        city_roots.add(r)
+            
+            for f_root in field_roots:
+                for c_root in city_roots:
+                    field_to_cities[f_root].add(c_root)
+
+        for f_root, cities in field_to_cities.items():
+            pts = len(cities) * 3
+            if pts > 0:
+                results.append({
+                    "type": "FIELD",
+                    "points": pts,
+                    "meeples": dict(field_dsu.meeples[f_root])
+                })
+
+        return results
 
     def render_ascii(self) -> str:
         """Returns an ASCII representation of the board."""
