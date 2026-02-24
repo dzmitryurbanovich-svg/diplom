@@ -176,10 +176,13 @@ class Board:
         completed = []
         
         # Check standard DSU features
+        completed_roots = {SegmentType.CITY: set(), SegmentType.ROAD: set()}
+        
         for seg_type in [SegmentType.CITY, SegmentType.ROAD]:
             dsu = self.dsu[seg_type]
             for root, edges in list(dsu.open_edges.items()):
                 if edges == 0 and len(dsu.meeples.get(root, {})) > 0:
+                    completed_roots[seg_type].add(root)
                     # Score it
                     pts_per_tile = 2 if seg_type == SegmentType.CITY else 1
                     pts = (dsu.size[root] + dsu.pennants[root]) * pts_per_tile
@@ -191,6 +194,14 @@ class Board:
                     })
                     # Return meeples
                     dsu.meeples[root] = {}
+                    
+        # Visually remove meeples from board for completed standard features
+        if completed_roots[SegmentType.CITY] or completed_roots[SegmentType.ROAD]:
+            for (x, y), tile in self.grid.items():
+                for seg in tile.segments:
+                    if seg.type in completed_roots and seg.meeple_player:
+                        if self.dsu[seg.type].find(seg.id) in completed_roots[seg.type]:
+                            seg.meeple_player = None
 
         # Check monasteries
         for (mx, my), owner in list(self.monasteries.items()):
@@ -209,6 +220,11 @@ class Board:
                     })
                     # Return meeple
                     self.monasteries[(mx, my)] = None
+                    # Visually remove meeple from the tile segment
+                    tile = self.grid[(mx, my)]
+                    for seg in tile.segments:
+                        if (getattr(seg, 'is_monastery', False) or seg.type == SegmentType.MONASTERY) and seg.meeple_player:
+                            seg.meeple_player = None
                     
         return completed
 

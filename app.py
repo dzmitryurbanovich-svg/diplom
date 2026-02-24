@@ -228,9 +228,10 @@ class GameState:
             self.board.place_tile(tx, ty, tile)
             self.logs.append(f"[{self.current_player}] Placed <b>{tile.name}</b> at ({tx}, {ty}) with rot {rot}.")
             
-            # Place Meeple logic (Randomly decide 20% of time)
+            # Place Meeple logic
             if self.meeples[self.current_player] > 0 and random.random() < 0.2:
-                for idx_seg, _ in enumerate(tile.segments):
+                for idx_seg, seg in enumerate(tile.segments):
+                    # Check if the feature is already completed so AI doesn't waste meeples
                     if self.board.place_meeple(tx, ty, idx_seg, self.current_player):
                         self.meeples[self.current_player] -= 1
                         self.logs.append(f"[{self.current_player}] Placed MEEPLE on feature at ({tx}, {ty}).")
@@ -249,7 +250,8 @@ class GameState:
         return self.get_ui_state(hf_token)
 
     def get_ui_state(self, hf_token: str = ""):
-        log_html = "<div style='height:400px; overflow-y:auto; font-family:monospace; background:#f4f4f4; padding:10px; border-radius:5px; border: 1px solid #ddd;'>"
+        # Instead of hardcoded #f4f4f4 background, use CSS variables for light/dark mode compatibility
+        log_html = "<div style='height:400px; overflow-y:auto; font-family:monospace; background: var(--background-fill-secondary); color: var(--body-text-color); padding:10px; border-radius:5px; border: 1px solid var(--border-color-primary);'>"
         log_html += "<br>".join(reversed(self.logs))
         log_html += "</div>"
         
