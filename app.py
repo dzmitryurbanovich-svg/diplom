@@ -109,44 +109,11 @@ class SVG_Renderer:
 import os
 import httpx
 import asyncio
-
-# --- Standalone HF LLM Connector for UI ---
-HF_API_URL = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct"
-
-def get_llm_strategy(board_state_text: str, hf_token: str) -> str:
-    if not hf_token.strip(): return "GREEDY"
-    headers = {"Authorization": f"Bearer {hf_token.strip()}"}
-    prompt = (
-        f"<s>[INST] You are a Carcassonne AI. Read the board, then reply with exactly one word.\n\n"
-        f"Board:\n{board_state_text}\n\n"
-        f"Choose your strategy:\n"
-        f"  CITY  - extend/complete a city for 2 pts/tile\n"
-        f"  ROAD  - build roads for 1 pt/tile\n"
-        f"  GREEDY - take any legal placement\n\n"
-        f"Reply with ONE word only (CITY, ROAD, or GREEDY): [/INST]"
-    )
-    payload = {
-        "inputs": prompt,
-        "parameters": {"return_full_text": False, "max_new_tokens": 5, "stop": ["\n", " "]}
-    }
-    
-    try:
-        # For Gradio Sync UI, we can use httpx standard sync client
-        response = httpx.post(HF_API_URL, headers=headers, json=payload, timeout=30.0)
-        result = response.json()
-        if isinstance(result, list): text = result[0].get('generated_text', '').strip().upper()
-        else: text = result.get('generated_text', '').strip().upper()
-        
-        for k in ["CITY", "ROAD", "GREEDY"]:
-            if k in text: return k
-        return "GREEDY"
-    except Exception as e:
-        print(f"UI LLM Error: {e}")
-        return "GREEDY"
+from src.logic.agents import GreedyAgent, StarAgent, MCTSAgent, HybridLLMAgent
 
 # Simple game orchestrator for the Gradio UI
 class GameState:
-    def __init__(self):
+    def __init__(self, p1_str="Greedy", p2_str="Star2.5", hf_token=""):
         self.board = Board()
         import random
         self.deck = DECK_DEFINITIONS[:] # copy
@@ -162,8 +129,17 @@ class GameState:
         self.logs = ["[Game Started] Starter tile placed at (0, 0)."]
         self.current_player = "Player1"
         self.game_over = False
+        
+        self.p1_str = p1_str
+        self.p2_str = p2_str
+        self.agents = {}
+        for p_name, a_str in [("Player1", p1_str), ("Player2", p2_str)]:
+            if a_str == "Star2.5": self.agents[p_name] = StarAgent(p_name)
+            elif a_str == "MCTS": self.agents[p_name] = MCTSAgent(p_name)
+            elif a_str == "Hybrid LLM": self.agents[p_name] = HybridLLMAgent(p_name, hf_token)
+            else: self.agents[p_name] = GreedyAgent(p_name)
 
-    def play_turn(self, hf_token: str = ""):
+    def play_turn(self):
         if not self.deck or self.game_over:
             if not self.game_over:
                 self.game_over = True
@@ -187,20 +163,10 @@ class GameState:
                 else:
                     self.logs.append(f"🤝 <b>It's a TIE ({p1_score} vs {p2_score})!</b>")
                     
-            return self.get_ui_state(hf_token)
+            return self.get_ui_state()
             
         tile = self.deck.pop(0)
         
-        # Decide Strategy based on Agent type
-        strategy = "GREEDY"
-        agent2_type = "Cloud_General (LLM)" if hf_token.strip() else "Greedy (No Token)"
-        
-        if self.current_player == "Player2" and agent2_type == "Cloud_General (LLM)":
-            board_txt = self.board.render_ascii()
-            strategy = get_llm_strategy(board_txt, hf_token)
-            self.logs.append(f"🤖 <b>[LLM THINKING]</b> {self.current_player} selected strategy: <b>{strategy}</b>")
-        
-        # Basic Heuristic Executer
         legal_moves = []
         to_check = set()
         for (x, y) in self.board.grid:
@@ -210,8 +176,6 @@ class GameState:
                     
         for tx, ty in to_check:
             for rot in [0, 90, 180, 270]:
-                test_tile = type(tile)(tile.name, tile.segments, tile.center_type) # Simple deep copy bypass for test
-                # Wait, Python needs deepcopy for rotate
                 import copy
                 test_tile = copy.deepcopy(tile)
                 test_tile.rotate(rot // 90)
@@ -221,21 +185,24 @@ class GameState:
         if not legal_moves:
             self.logs.append(f"[{self.current_player}] Drew {tile.name} but no legal moves. Discarded.")
         else:
-            # Greedy: just pick the first one for the demo UI loop
-            import random
-            tx, ty, rot = random.choice(legal_moves)
+            agent = self.agents[self.current_player]
+            
+            # Use specific signature if it's HybridLLMAgent to pass remaining tiles
+            if isinstance(agent, HybridLLMAgent):
+                tx, ty, rot, meeple_idx = agent.select_move(self.board, tile, legal_moves, self.meeples[self.current_player], len(self.deck))
+                self.logs.append(f"🤖 <b>[LLM THINKING]</b> {self.current_player} (Hybrid LLM) analyzed board.")
+            else:
+                tx, ty, rot, meeple_idx = agent.select_move(self.board, tile, legal_moves, self.meeples[self.current_player])
+                
             tile.rotate(rot // 90)
             self.board.place_tile(tx, ty, tile)
             self.logs.append(f"[{self.current_player}] Placed <b>{tile.name}</b> at ({tx}, {ty}) with rot {rot}.")
             
             # Place Meeple logic
-            if self.meeples[self.current_player] > 0 and random.random() < 0.2:
-                for idx_seg, seg in enumerate(tile.segments):
-                    # Check if the feature is already completed so AI doesn't waste meeples
-                    if self.board.place_meeple(tx, ty, idx_seg, self.current_player):
-                        self.meeples[self.current_player] -= 1
-                        self.logs.append(f"[{self.current_player}] Placed MEEPLE on feature at ({tx}, {ty}).")
-                        break
+            if meeple_idx is not None and self.meeples[self.current_player] > 0:
+                if self.board.place_meeple(tx, ty, meeple_idx, self.current_player):
+                    self.meeples[self.current_player] -= 1
+                    self.logs.append(f"[{self.current_player}] Placed MEEPLE on feature at ({tx}, {ty}).")
         
         # End game step computations
         completed = self.board.get_completed_features()
@@ -247,9 +214,9 @@ class GameState:
 
         # Switch player
         self.current_player = "Player2" if self.current_player == "Player1" else "Player1"
-        return self.get_ui_state(hf_token)
+        return self.get_ui_state()
 
-    def get_ui_state(self, hf_token: str = ""):
+    def get_ui_state(self):
         # Instead of hardcoded #f4f4f4 background, use CSS variables for light/dark mode compatibility
         log_html = "<div style='height:400px; overflow-y:auto; font-family:monospace; background: var(--background-fill-secondary); color: var(--body-text-color); padding:10px; border-radius:5px; border: 1px solid var(--border-color-primary);'>"
         log_html += "<br>".join(reversed(self.logs))
@@ -257,13 +224,10 @@ class GameState:
         
         svg = SVG_Renderer.render_board(self.board)
         
-        agent1 = "Greedy"
-        agent2 = "Cloud_General (LLM)" if hf_token.strip() else "Greedy (No Token)"
-        
         stats = f"""
         ### 📊 Current Score
-        - 🔴 **Player 1** ({agent1}): {self.scores['Player1']} pts *(Meeples: {self.meeples['Player1']}/7)*
-        - 🔵 **Player 2** ({agent2}): {self.scores['Player2']} pts *(Meeples: {self.meeples['Player2']}/7)*
+        - 🔴 **Player 1** ({self.p1_str}): {self.scores['Player1']} pts *(Meeples: {self.meeples['Player1']}/7)*
+        - 🔵 **Player 2** ({self.p2_str}): {self.scores['Player2']} pts *(Meeples: {self.meeples['Player2']}/7)*
         
         **Tiles remaining:** {len(self.deck)}/72
         **Current Turn:** {self.current_player}
@@ -273,13 +237,25 @@ class GameState:
 
 _global_state = GameState()
 
-def step_game(token):
-    return _global_state.play_turn(token)
+def step_game():
+    return _global_state.play_turn()
 
-def reset_game(token):
+def reset_game(p1, p2, token):
     global _global_state
-    _global_state = GameState()
-    return _global_state.get_ui_state(token)
+    _global_state = GameState(p1, p2, token)
+    return _global_state.get_ui_state()
+
+def change_agents(p1, p2, token):
+    _global_state.p1_str = p1
+    _global_state.p2_str = p2
+    for p_name, a_str in [("Player1", p1), ("Player2", p2)]:
+        if a_str == "Star2.5": _global_state.agents[p_name] = StarAgent(p_name)
+        elif a_str == "MCTS": _global_state.agents[p_name] = MCTSAgent(p_name)
+        elif a_str == "Hybrid LLM": _global_state.agents[p_name] = HybridLLMAgent(p_name, token)
+        else: _global_state.agents[p_name] = GreedyAgent(p_name)
+    return _global_state.get_ui_state()
+
+AGENT_CHOICES = ["Greedy", "Star2.5", "MCTS", "Hybrid LLM"]
 
 with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
     gr.Markdown("# 🏰 Carcassonne AI Tournament Engine")
@@ -289,29 +265,37 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
         with gr.Column(scale=2):
             board_view = gr.HTML(value="")
         with gr.Column(scale=1):
-            token_input = gr.Textbox(label="Hugging Face Token (for AI)", type="password", placeholder="hf_...", value=os.environ.get("HF_TOKEN", ""))
+            with gr.Row():
+                player1_dd = gr.Dropdown(choices=AGENT_CHOICES, value="Greedy", label="🔴 Player 1 AI Mechanism")
+                player2_dd = gr.Dropdown(choices=AGENT_CHOICES, value="Star2.5", label="🔵 Player 2 AI Mechanism")
+                
+            token_input = gr.Textbox(label="Hugging Face Token (Required for Hybrid LLM only)", type="password", placeholder="hf_...", value=os.environ.get("HF_TOKEN", ""))
             stats_view = gr.Markdown(value="Hit start to begin.")
-            controls = gr.Row()
-            with controls:
+            
+            with gr.Row():
                 btn_step = gr.Button("▶️ Next Turn", variant="primary")
                 btn_auto = gr.Button("⏩ Auto-Play (x10)", variant="secondary")
                 btn_reset = gr.Button("🔄 Reset Board")
             
             logs_view = gr.HTML(value="Logs will appear here.")
             
-    btn_step.click(fn=step_game, inputs=[token_input], outputs=[board_view, logs_view, stats_view])
-    btn_reset.click(fn=reset_game, inputs=[token_input], outputs=[board_view, logs_view, stats_view])
+    btn_step.click(fn=step_game, inputs=[], outputs=[board_view, logs_view, stats_view])
+    btn_reset.click(fn=reset_game, inputs=[player1_dd, player2_dd, token_input], outputs=[board_view, logs_view, stats_view])
     
-    def auto_play_10(token):
+    # Real-time UI updates for dropdown changes
+    player1_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd, token_input], outputs=[board_view, logs_view, stats_view])
+    player2_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd, token_input], outputs=[board_view, logs_view, stats_view])
+    
+    def auto_play_10():
         for _ in range(10):
-            r1, r2, r3 = _global_state.play_turn(token)
+            r1, r2, r3 = _global_state.play_turn()
             if _global_state.game_over: break
         return r1, r2, r3
         
-    btn_auto.click(fn=auto_play_10, inputs=[token_input], outputs=[board_view, logs_view, stats_view])
+    btn_auto.click(fn=auto_play_10, inputs=[], outputs=[board_view, logs_view, stats_view])
     
     # Init
-    demo.load(fn=reset_game, inputs=[token_input], outputs=[board_view, logs_view, stats_view])
+    demo.load(fn=reset_game, inputs=[player1_dd, player2_dd, token_input], outputs=[board_view, logs_view, stats_view])
 
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7860)

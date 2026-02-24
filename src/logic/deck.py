@@ -97,13 +97,10 @@ def create_deck() -> list[Tile]:
 
     # 2 cities opposite (N, S), Road Straight E, W
     add(3, "CityOpposite_Road", [(C, [N], False, False), (C, [S], False, False), (R, [E,W], False, False)])
-    
-    # 2 cities adjacent N, W, no road
-    add(2, "CityAdj", [(C, [N], False, False), (C, [W], False, False), (F, [S,E], False, False)])
 
-    # Fill up the rest with basic tiles to ensure 72 for complete logic coverage
-    # Total so far: 2+4+1+4+5+2+1+3+2+3+3+3+2+3+2+1+4+8+9+3+1+1+2+3+2 = 71
-    # Missing exactly 1 tile! Let's add the Starter tile explicitly to make 72.
+    # We use one of the "City1_RoadStraight" tiles as the starter tile later.
+    # Total tiles: 2+4+1+4+5+2+1+3+2+3+3+3+2+3+2+1+4+8+9+3+1+1+2+3 = 71
+    # Adding 1 extra City1_RoadStraight to act as the exact Starter tile = 72
     add(1, "Starter", [(C, [N], False, False), (R, [E,W], False, False), (F, [S], False, False)])
     
     return deck
