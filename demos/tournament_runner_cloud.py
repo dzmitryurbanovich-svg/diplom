@@ -1,23 +1,23 @@
 import asyncio
 import os
 import json
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import ClientSession
+from mcp.client.sse import sse_client
 from demos.agents_baseline import GreedyAgent
 from demos.agents_hybrid import HybridAgent
 
-async def run_tournament():
-    server_params = StdioServerParameters(
-        command="venv/bin/python",
-        args=["src/mcp/server.py"],
-        env={**os.environ, "PYTHONPATH": os.getcwd()}
-    )
+# Your Hugging Face Space SSE URL
+HF_SPACE_URL = "https://dzmitro-carcassonne-ai.hf.space/sse"
 
-    async with stdio_client(server_params) as (read, write):
+async def run_tournament():
+    print(f"[*] Connecting to Cloud MCP Server: {HF_SPACE_URL}...")
+    
+    async with sse_client(HF_SPACE_URL) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
 
             # Define players: Greedy vs Hybrid
+            # These agents are transport-agnostic and work with the cloud session
             players = [
                 GreedyAgent("GreedyPlayer", session),
                 HybridAgent("Hybrid_General", session)
@@ -25,7 +25,7 @@ async def run_tournament():
 
             deck = ["starter", "city_road", "city_road", "city_road", "city_road", "city_road"]
             
-            print(f"[*] Starting Tournament: {players[0].name} vs {players[1].name}")
+            print(f"[*] Starting Cloud Tournament: {players[0].name} vs {players[1].name}")
             print(f"[*] Deck size: {len(deck)}")
 
             for i, tile_name in enumerate(deck):
@@ -44,9 +44,15 @@ async def run_tournament():
                 print(board_result.content[0].text)
 
             # Final scoring (from strategic context)
-            print("\n=== TOURNAMENT RESULTS ===")
+            print("\n=== CLOUD TOURNAMENT RESULTS ===")
             stats = await session.call_tool("get_strategic_context", {})
             print(stats.content[0].text)
 
 if __name__ == "__main__":
-    asyncio.run(run_tournament())
+    # Ensure dependencies are installed: pip install httpx-sse
+    try:
+        asyncio.run(run_tournament())
+    except ImportError:
+        print("[ERROR] Missing dependencies! Please run: pip install httpx-sse")
+    except Exception as e:
+        print(f"[ERROR] Tournament failed: {e}")

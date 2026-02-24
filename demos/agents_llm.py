@@ -4,7 +4,7 @@ from mcp import ClientSession
 from demos.agents_baseline import BaseAgent
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL = "llama3.2"
+MODEL = "llama3.1"
 
 class LLMAgent(BaseAgent):
     def __init__(self, name, session: ClientSession, strategy="standard"):
@@ -52,6 +52,9 @@ class LLMAgent(BaseAgent):
                 result = response.json()
                 message = result.get('message', {})
                 messages.append(message)
+
+                if message.get('content'):
+                    print(f"[AI THOUGHTS] {self.name}: {message['content']}")
 
                 if 'tool_calls' in message:
                     for tool_call in message['tool_calls']:

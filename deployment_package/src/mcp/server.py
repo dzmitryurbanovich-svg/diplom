@@ -1,5 +1,6 @@
 import asyncio
 import os
+import json
 from mcp.server.models import InitializationOptions
 from mcp.server import NotificationOptions, Server
 from mcp.server.stdio import stdio_server
@@ -138,13 +139,12 @@ async def handle_call_tool(
             for rot in [0, 90, 180, 270]:
                 test_tile = DECK_DEFINITIONS[tile_name]()
                 test_tile.rotate(rot // 90)
-                # We need a non-destructive way to check legality, 
-                # but our Board.place_tile is currently destructive.
-                # For this demo, we'll implement a dry-run check or use a temporary board.
-                # (Skipping full dry-run implementation for brevity in this specific tool call)
-                legal_moves.append({"x": tx, "y": ty, "rotation": rot})
+                if board.is_legal_move(tx, ty, test_tile):
+                    legal_moves.append({"x": tx, "y": ty, "rotation": rot})
         
-        return [types.TextContent(type="text", text=f"Legal moves for {tile_name}: {legal_moves}")]
+        import sys
+        print(f"[*] Returning {len(legal_moves)} legal moves for {tile_name}", file=sys.stderr)
+        return [types.TextContent(type="text", text=json.dumps(legal_moves))]
 
     elif name == "place_tile":
         try:
@@ -166,7 +166,11 @@ async def handle_call_tool(
         if success:
             return [types.TextContent(type="text", text=f"Success: Placed {tile_name} at ({x}, {y}) with rotation {rot}.")]
         else:
-            return [types.TextContent(type="text", text=f"Error: Invalid move at ({x}, {y}).")]
+            reason = "Reason unknown"
+            if (x, y) in board.grid: reason = "Position occupied"
+            elif not board.is_legal_move(x, y, tile): reason = "Illegal move (no adjacency or mismatch)"
+            print(f"[ERROR] place_tile failed for {tile_name} at ({x}, {y}): {reason}", file=sys.stderr)
+            return [types.TextContent(type="text", text=f"Error: Invalid move at ({x}, {y}). {reason}")]
 
     elif name == "get_strategic_context":
         # Simplified strategic analysis
@@ -216,11 +220,18 @@ async def handle_sse(request):
             ),
         )
 
+async def handle_messages(request):
+    await sse.handle_post_message(request.scope, request.receive, request._send)
+
+async def handle_root(request):
+    return JSONResponse({"status": "running", "mcp_endpoint": "/sse"})
+
 starlette_app = Starlette(
     debug=True,
     routes=[
+        Route("/", endpoint=handle_root),
         Route("/sse", endpoint=handle_sse),
-        Route("/messages", endpoint=sse.handle_post_message, methods=["POST"]),
+        Route("/messages", endpoint=handle_messages, methods=["POST"]),
     ],
 )
 

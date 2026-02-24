@@ -220,11 +220,18 @@ async def handle_sse(request):
             ),
         )
 
+async def handle_messages(request):
+    await sse.handle_post_message(request.scope, request.receive, request._send)
+
+async def handle_root(request):
+    return JSONResponse({"status": "running", "mcp_endpoint": "/sse"})
+
 starlette_app = Starlette(
     debug=True,
     routes=[
+        Route("/", endpoint=handle_root),
         Route("/sse", endpoint=handle_sse),
-        Route("/messages", endpoint=sse.handle_post_message, methods=["POST"]),
+        Route("/messages", endpoint=handle_messages, methods=["POST"]),
     ],
 )
 
