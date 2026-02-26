@@ -92,15 +92,24 @@ class SVG_Renderer:
         svg.append('</svg></div>')
         
         # Inject JavaScript to handle clicks on ghosts
-        # Use a more robust selector that traverses up if needed
         js = """
         <script>
         function placeTile(x, y) {
+            console.log("Carcassonne: Clicked ghost at", x, y);
+            // Try different selectors for the hidden input
             const input = document.querySelector('#hidden_coord_input textarea') || 
-                          window.parent.document.querySelector('#hidden_coord_input textarea');
+                          document.querySelector('#hidden_coord_input input') ||
+                          window.parent.document.querySelector('#hidden_coord_input textarea') ||
+                          window.parent.document.querySelector('#hidden_coord_input input');
+            
             if (input) {
+                console.log("Carcassonne: Input found, updating value...");
                 input.value = x + "," + y;
+                // Trigger events to let Gradio know the value changed
                 input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            } else {
+                console.error("Carcassonne: Could not find hidden_coord_input element in DOM!");
             }
         }
         </script>
@@ -110,11 +119,11 @@ class SVG_Renderer:
     @classmethod
     def render_ghost(cls, px, py, mx, my, is_selected=False) -> str:
         s = cls.TILE_SIZE
-        opacity = "0.6" if is_selected else "0.2"
-        stroke_width = "4" if is_selected else "2"
+        opacity = "0.7" if is_selected else "0.3"
+        stroke_width = "5" if is_selected else "2"
         dash = "none" if is_selected else "5,5"
-        # Clickable ghost tile
-        return f'<rect x="{px+5}" y="{py+5}" width="{s-10}" height="{s-10}" rx="8" fill="#ffd166" fill-opacity="{opacity}" stroke="#ffd166" stroke-width="{stroke_width}" stroke-dasharray="{dash}" cursor="pointer" onclick="placeTile({mx}, {my})"/>'
+        # Clickable ghost tile - ensure pointer-events are on
+        return f'<rect x="{px+2}" y="{py+2}" width="{s-4}" height="{s-4}" rx="10" fill="#ffd166" fill-opacity="{opacity}" stroke="#ffd166" stroke-width="{stroke_width}" stroke-dasharray="{dash}" cursor="pointer" style="pointer-events: all;" onclick="placeTile({mx}, {my})"/>'
 
         
     @classmethod
@@ -430,7 +439,7 @@ def change_agents(p1, p2, token):
 
 AGENT_CHOICES = ["Human", "Greedy", "Star2.5", "MCTS", "Hybrid LLM"]
 
-with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
+with gr.Blocks(title="Carcassonne AI Tournament Viewer", css="#hidden_coord_input { display: none !important; } .hint-box { background: var(--amber-50); padding: 10px; border-radius: 8px; border-left: 4px solid var(--amber-500); margin-top: 10px; }") as demo:
     gr.Markdown("# 🏰 Carcassonne AI Tournament Engine")
     gr.Markdown("Watch entirely autonomous agents compete in the classic board game, applying heuristic tree search and LLM-driven strategy.")
     
@@ -460,11 +469,11 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
                         human_coord_display = gr.Markdown("Click a gold spot on the board!")
                         human_meeple_dd = gr.Dropdown(label="Meeple Target")
                         human_submit = gr.Button("✅ Confirm Move", variant="primary")
-                
                 human_hint_md = gr.HTML("💡 <b>Hint:</b> Click a gold spot on the board!", elem_classes=["hint-box"])
                 
                 # Hidden textbox to receive coordinate clicks from SVG
-                hidden_coords = gr.Textbox(visible=False, elem_id="hidden_coord_input")
+                # We keep it visible=True but use CSS to hide it, ensuring it exists in the DOM
+                hidden_coords = gr.Textbox(visible=True, elem_id="hidden_coord_input", label="Internal Coord", container=False)
                 gr.Markdown("---")
             # ------------------------------------------
             
