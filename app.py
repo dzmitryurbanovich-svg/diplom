@@ -346,12 +346,13 @@ class GameState:
                 self.logs.append(f"🤝 <b>It's a TIE ({p1_score} vs {p2_score})!</b>")
         return self.get_ui_state()
 
-    def get_ui_state(self):
         # Determine ghost moves for Human interaction
         ghost_moves = []
+        human_coord_choices = []
         if self.pending_human_turn:
             # Only show ghost moves for the CURRENTLY selected human rotation
             ghost_moves = [(x, y, r) for x, y, r in self.pending_legal_moves if r == self.human_selected_rotation]
+            human_coord_choices = [f"{x},{y}" for x, y, r in ghost_moves]
             
         log_html = "<div style='height:400px; overflow-y:auto; font-family:monospace; background: var(--background-fill-secondary); color: var(--body-text-color); padding:10px; border-radius:5px; border: 1px solid var(--border-color-primary);'>"
         log_html += "<br>".join(reversed(self.logs))
@@ -368,7 +369,7 @@ class GameState:
         **Current Turn:** {self.current_player}
         """
         
-        return svg, log_html, stats
+        return svg, log_html, stats, human_coord_choices
 
     def rotate_human_tile(self):
         if not self.pending_human_turn: return
@@ -385,7 +386,7 @@ class GameState:
 _global_state = GameState("Human", "Star2.5")
 
 def _unpack_ui_state(gs):
-    svg, log, stats = gs.get_ui_state()
+    svg, log, stats, coord_choices = gs.get_ui_state()
     
     # Initialize all UI variables with defaults to prevent UnboundLocalError
     controls_visible = False
@@ -394,6 +395,7 @@ def _unpack_ui_state(gs):
     meeple_val = "None"
     tile_html_val = "<i>Waiting for turn...</i>"
     hint_val = "Ready. Click 'Next Turn' to proceed."
+    coord_dd_val = None
     
     if gs.pending_human_turn:
         controls_visible = True
@@ -402,24 +404,24 @@ def _unpack_ui_state(gs):
         letter = TILE_LETTER_MAP.get(t.name, "D")
         b64 = ASSETS_CACHE.get(letter)
         rot = gs.human_selected_rotation
-        rot = gs.human_selected_rotation
         tile_html_val = f'''
         <div style="text-align:center;">
             <p><b>Draw: {t.name}</b></p>
             <div draggable="true" ondragstart="event.dataTransfer.setData('text/plain', 'tile')" style="cursor: grab; display: inline-block; transform: rotate({rot}deg); transition: transform 0.3s;">
                 <img src="{b64}" width="120" style="margin: 0 auto; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));"/>
-                <p style="font-size: 0.8em; color: #666; margin-top: 5px;">↔️ Drag me to the board!</p>
+                <p style="font-size: 0.8em; color: #666; margin-top: 5px;">↔️ Drag or Click the board!</p>
             </div>
             <p>Rotation: {rot}°</p>
         </div>
         '''
         
         if not gs.human_selected_coords:
-            coord_val = "📍 Click a gold spot on the board!"
-            hint_val = "💡 <b>Tip:</b> If you don't see any gold spots, try <b>🔄 Rotating</b> the tile to find a match!"
+            coord_val = "📍 Click or select coordinates below"
+            hint_val = "💡 <b>Tip:</b> If moves list is empty, try <b>🔄 Rotating</b> the tile!"
         else:
             coord_val = f"✅ Selected: **({gs.human_selected_coords})**"
             hint_val = "📝 <b>Next:</b> Choose if you want to place a 👤 <b>Meeple</b>, then click <b>Confirm Move</b>."
+            coord_dd_val = gs.human_selected_coords
         
         meeple_choices = ["None"] + [f"{s.type.name} - {i}" for i, s in enumerate(t.segments)]
         meeple_val = "None"
@@ -430,7 +432,8 @@ def _unpack_ui_state(gs):
         gr.update(value=coord_val),
         gr.update(choices=meeple_choices, value=meeple_val),
         gr.update(value=tile_html_val),
-        gr.update(value=hint_val)
+        gr.update(value=hint_val),
+        gr.update(choices=coord_choices, value=coord_dd_val)
     )
 
 def step_game():
@@ -521,6 +524,7 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer", head=HEAD_JS, css="#hid
                     with gr.Column():
                         btn_rotate = gr.Button("🔄 Rotate Tile")
                         human_coord_display = gr.Markdown("Click a gold spot on the board!")
+                        human_coord_dd = gr.Dropdown(label="Select Location (Fallback)", choices=[])
                         human_meeple_dd = gr.Dropdown(label="Meeple Target")
                         human_submit = gr.Button("✅ Confirm Move", variant="primary")
                 human_hint_md = gr.HTML("💡 <b>Hint:</b> Click a gold spot on the board!", elem_classes=["hint-box"])
@@ -533,14 +537,15 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer", head=HEAD_JS, css="#hid
             
             logs_view = gr.HTML(value="Logs will appear here.")
             
-    # Function wiring: unpack all 8 outputs: (svg, log, stats, panel_viz, coord_info, meeple_dd, tile_disp, hint)
-    UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_coord_display, human_meeple_dd, human_tile_display, human_hint_md]
+    # Function wiring: unpack all 9 outputs
+    UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_coord_display, human_meeple_dd, human_tile_display, human_hint_md, human_coord_dd]
     
     btn_step.click(fn=step_game, inputs=[], outputs=UI_OUTPUTS)
     btn_rotate.click(fn=rotate_tile, inputs=[], outputs=UI_OUTPUTS)
     
     # Coordinates click handler
     hidden_coords.change(fn=set_coords, inputs=[hidden_coords], outputs=UI_OUTPUTS)
+    human_coord_dd.change(fn=set_coords, inputs=[human_coord_dd], outputs=UI_OUTPUTS)
     
     human_submit.click(fn=submit_human, inputs=[human_meeple_dd], outputs=UI_OUTPUTS)
     
