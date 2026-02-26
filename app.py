@@ -58,7 +58,7 @@ class PIL_Renderer:
     TILE_SIZE = 120 # Slightly larger for better detail
     
     @classmethod
-    def render_board(cls, board, last_played=None, ghost_moves=None, selected_coords=None):
+    def render_board(cls, board, last_played=None, ghost_moves=None, selected_coords=None, meeple_hints=None):
         all_points = list(board.grid.keys())
         if ghost_moves:
             all_points.extend([(m[0], m[1]) for m in ghost_moves])
@@ -132,6 +132,24 @@ class PIL_Renderer:
                     # Highlight selected ghost
                     overlay = Image.new("RGBA", (cls.TILE_SIZE-6, cls.TILE_SIZE-6), (255, 209, 102, 40))
                     canvas.paste(overlay, (tx+3, ty+3), overlay)
+                    
+                    # Draw Meeple Hints
+                    if meeple_hints:
+                        # Draw small indicators for valid meeple spots
+                        # We use a simple circular arrangement around the center
+                        import math
+                        num_hints = len(meeple_hints)
+                        for i, (seg_idx, seg_name) in enumerate(meeple_hints):
+                            # Position dots in a circle
+                            angle = (i / num_hints) * 2 * math.pi if num_hints > 1 else 0
+                            dist = cls.TILE_SIZE * 0.25
+                            hx = tx + cls.TILE_SIZE // 2 + int(dist * math.cos(angle)) - 5
+                            hy = ty + cls.TILE_SIZE // 2 + int(dist * math.sin(angle)) - 5
+                            
+                            # Use player color for hint
+                            hint_color = (255, 209, 102, 255) # Golden for "you can place here"
+                            draw.ellipse([hx, hy, hx+10, hy+10], fill=hint_color, outline="white")
+                            draw.text((hx+2, hy-12), str(seg_idx), fill="white")
 
         return canvas, (min_x, max_x, min_y, max_y)
 
@@ -350,6 +368,28 @@ class GameState:
         img_obj, bounds = PIL_Renderer.render_board(self.board, getattr(self, "last_played", None), ghost_moves=ghost_moves, selected_coords=self.human_selected_coords)
         self.board_bounds = bounds
         
+        # Calculate Meeple Hints for the selected coord
+        meeple_hints = []
+        if pending_human and self.human_selected_coords:
+            tx, ty = map(int, self.human_selected_coords.split(","))
+            t = self.pending_tile
+            # Simulate placement to check legal meeple spots
+            import copy
+            sim_board = copy.deepcopy(self.board)
+            sim_tile = copy.deepcopy(t)
+            sim_tile.rotate(self.human_selected_rotation // 90)
+            if sim_board.place_tile(tx, ty, sim_tile):
+                for i, seg in enumerate(sim_tile.segments):
+                    # Check if meeple can be placed there
+                    if sim_board.place_meeple(tx, ty, i, self.current_player):
+                        meeple_hints.append((i, seg.type.name))
+            
+            # Re-render with hints
+            img_obj, _ = PIL_Renderer.render_board(self.board, getattr(self, "last_played", None), 
+                                                 ghost_moves=ghost_moves, 
+                                                 selected_coords=self.human_selected_coords,
+                                                 meeple_hints=meeple_hints)
+        
         stats = f"""
         ### 📊 Current Score
         - 🔴 **Player 1** ({self.p1_str}): {self.scores['Player1']} pts *(Meeples: {self.meeples['Player1']}/7)*
@@ -479,10 +519,20 @@ def set_coords(coords):
     return _unpack_ui_state(_global_state)
 
 def submit_human(meeple):
+    """Executes the human move and automatically resumes the game loop."""
     _global_state.execute_human_move(meeple)
-    # Don't auto-resume here to let user see their move, 
-    # they can click 'Resume' themselves or we can add auto-resume if desired.
-    return _unpack_ui_state(_global_state)
+    
+    # After submission, we want to auto-resume the game loop
+    # We yield the immediate state first
+    yield _unpack_ui_state(_global_state)
+    
+    # Small pause to let user see their tile placement
+    import time
+    time.sleep(1.0)
+    
+    # Resume the loop
+    for update in game_loop():
+        yield update
 
 
 def reset_game(p1, p2, token):
@@ -524,19 +574,23 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
                 btn_start = gr.Button("▶️ Start / Resume Game", variant="primary")
                 btn_reset = gr.Button("🔄 Reset Board")
                 
-            # --- HUMAN CONTROLS (Hidden by default) ---
+            # --- HUMAN CONTROLS (Modernized Layout) ---
             with gr.Group(visible=False, elem_id="human_controls") as human_panel:
                 gr.Markdown("### 👤 Your Turn!")
                 with gr.Row():
-                    human_tile_display = gr.HTML()
-                    with gr.Column():
-                        btn_rotate = gr.Button("🔄 Rotate Tile")
-                        human_coord_display = gr.Markdown("Click a gold spot on the board!")
-                        human_coord_dd = gr.Dropdown(label="Select Location (Fallback)", choices=[])
-                        human_meeple_dd = gr.Dropdown(label="Meeple Target")
-                        human_submit = gr.Button("✅ Confirm Move", variant="primary")
-                human_hint_md = gr.HTML("💡 <b>Hint:</b> Click a gold spot on the board!", elem_classes=["hint-box"])
-                
+                    # Sidebar for tile preview
+                    with gr.Column(scale=1):
+                        human_tile_display = gr.HTML()
+                        human_hint_md = gr.HTML("💡 <b>Hint:</b> Click a gold spot on the board!", elem_classes=["hint-box"])
+                    
+                    # Main action area
+                    with gr.Column(scale=2):
+                        with gr.Group():
+                            btn_rotate = gr.Button("🔄 Rotate Tile", variant="secondary")
+                            human_coord_display = gr.Markdown("📍 **Select a location**")
+                            human_coord_dd = gr.Dropdown(label="Location Fallback", choices=[])
+                            human_meeple_dd = gr.Dropdown(label="👤 Meeple Target")
+                            human_submit = gr.Button("✅ Confirm Move", variant="primary", elem_classes=["lg-btn"])
                 gr.Markdown("---")
             # ------------------------------------------
             
@@ -565,5 +619,9 @@ if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0", 
         server_port=7860,
-        css=".hint-box { background: var(--amber-50); padding: 10px; border-radius: 8px; border-left: 4px solid var(--amber-500); margin-top: 10px; }"
+        css="""
+        .hint-box { background: var(--amber-50); padding: 10px; border-radius: 8px; border-left: 4px solid var(--amber-500); margin-top: 10px; font-size: 0.9em; }
+        #human_controls { border: 2px solid var(--primary-500); padding: 15px; border-radius: 12px; background: var(--background-fill-primary); }
+        .lg-btn { height: 60px !important; font-size: 1.2em !important; }
+        """
     )
