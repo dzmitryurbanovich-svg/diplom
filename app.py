@@ -474,19 +474,26 @@ AGENT_CHOICES = ["Human", "Greedy", "Star2.5", "MCTS", "Hybrid LLM"]
 
 HEAD_JS = """
 <script>
-// Global bridge function
 window.set_carcassonne_coords = function(x, y) {
     console.log("Carcassonne API: Setting coords to", x, y);
-    const input = document.querySelector('#hidden_coord_input textarea') || 
-                  document.querySelector('#hidden_coord_input input');
-    if (input) {
-        input.value = x + "," + y;
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        input.dispatchEvent(new Event('change', { bubbles: true }));
+    
+    // Ищем именно textarea внутри скрытого компонента
+    const inputArea = document.querySelector('#hidden_coord_input textarea');
+    
+    if (inputArea) {
+        // Вызываем нативный сеттер браузера, чтобы обойти защиту Svelte/Gradio
+        // Это гарантирует, что фреймворк заметит изменение значения
+        const nativeValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+        nativeValueSetter.call(inputArea, x + "," + y);
+        
+        // Диспатчим событие input, которое Gradio гарантированно поймает
+        inputArea.dispatchEvent(new Event('input', { bubbles: true }));
+    } else {
+        console.error("Не удалось найти скрытое поле для координат (#hidden_coord_input textarea)");
     }
 };
 
-// Listen for messages from inside IFrames (for Hugging Face)
+// Прослушивание сообщений для работы внутри IFrame (Hugging Face)
 window.addEventListener('message', function(event) {
     if (event.data && event.data.type === 'carcassonne_place') {
         console.log("Carcassonne BRIDGE: Message received", event.data.coords);
