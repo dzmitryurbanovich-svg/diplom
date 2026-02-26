@@ -92,26 +92,26 @@ class SVG_Renderer:
         svg.append('</svg></div>')
         
         # Inject JavaScript to handle clicks on ghosts
-        js = """
+        js = f"""
         <script>
-        function placeTile(x, y) {
-            console.log("Carcassonne: Clicked ghost at", x, y);
-            // Try different selectors for the hidden input
-            const input = document.querySelector('#hidden_coord_input textarea') || 
-                          document.querySelector('#hidden_coord_input input') ||
-                          window.parent.document.querySelector('#hidden_coord_input textarea') ||
-                          window.parent.document.querySelector('#hidden_coord_input input');
-            
-            if (input) {
-                console.log("Carcassonne: Input found, updating value...");
-                input.value = x + "," + y;
-                // Trigger events to let Gradio know the value changed
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-                input.dispatchEvent(new Event('change', { bubbles: true }));
-            } else {
-                console.error("Carcassonne: Could not find hidden_coord_input element in DOM!");
-            }
-        }
+        function placeTile(x, y) {{
+            console.log("Carcassonne: Clicked ghost at " + x + "," + y);
+            const val = x + "," + y;
+            // Try global function, then local search, then parent search
+            if (window.set_carcassonne_coords) {{
+                window.set_carcassonne_coords(x, y);
+            }} else if (window.parent && window.parent.set_carcassonne_coords) {{
+                window.parent.set_carcassonne_coords(x, y);
+            }} else {{
+                // Emergency fallback selector
+                const input = document.querySelector('#hidden_coord_input textarea') || 
+                              document.querySelector('#hidden_coord_input input');
+                if (input) {{
+                    input.value = val;
+                    input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                }}
+            }}
+        }}
         </script>
         """
         return "\n".join(svg) + js
@@ -439,7 +439,24 @@ def change_agents(p1, p2, token):
 
 AGENT_CHOICES = ["Human", "Greedy", "Star2.5", "MCTS", "Hybrid LLM"]
 
-with gr.Blocks(title="Carcassonne AI Tournament Viewer", css="#hidden_coord_input { display: none !important; } .hint-box { background: var(--amber-50); padding: 10px; border-radius: 8px; border-left: 4px solid var(--amber-500); margin-top: 10px; }") as demo:
+HEAD_JS = """
+<script>
+window.set_carcassonne_coords = function(x, y) {
+    console.log("Carcassonne GLOBAL: updating to", x, y);
+    const input = document.querySelector('#hidden_coord_input textarea') || 
+                  document.querySelector('#hidden_coord_input input');
+    if (input) {
+        input.value = x + "," + y;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+        console.error("Carcassonne GLOBAL: input not found!");
+    }
+};
+</script>
+"""
+
+with gr.Blocks(title="Carcassonne AI Tournament Viewer", head=HEAD_JS, css="#hidden_coord_input { opacity: 0 !important; height: 0px !important; overflow: hidden !important; pointer-events: none !important; } .hint-box { background: var(--amber-50); padding: 10px; border-radius: 8px; border-left: 4px solid var(--amber-500); margin-top: 10px; }") as demo:
     gr.Markdown("# 🏰 Carcassonne AI Tournament Engine")
     gr.Markdown("Watch entirely autonomous agents compete in the classic board game, applying heuristic tree search and LLM-driven strategy.")
     
