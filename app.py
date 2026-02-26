@@ -49,31 +49,67 @@ class SVG_Renderer:
     TILE_SIZE = 100
     
     @classmethod
-    def render_board(cls, board: Board, last_played=None) -> str:
-        if not board.grid:
+    def render_board(cls, board, last_played=None, ghost_moves=None) -> str:
+        if not board.grid and not ghost_moves:
             return "<div style='text-align:center; padding:50px; color:#666;'>Game has not started.</div>"
             
-        min_x = min(x for x, y in board.grid.keys())
-        max_x = max(x for x, y in board.grid.keys())
-        min_y = min(y for x, y in board.grid.keys())
-        max_y = max(y for x, y in board.grid.keys())
+        all_points = list(board.grid.keys())
+        if ghost_moves:
+            all_points.extend([(m[0], m[1]) for m in ghost_moves])
+            
+        if not all_points: all_points = [(0,0)]
         
-        width = (max_x - min_x + 1) * cls.TILE_SIZE
-        height = (max_y - min_y + 1) * cls.TILE_SIZE
+        min_x = min(x for x, y in all_points)
+        max_x = max(x for x, y in all_points)
+        min_y = min(y for x, y in all_points)
+        max_y = max(y for x, y in all_points)
         
-        svg = [f'<div style="width: 100%; max-height: 550px; overflow: auto; background-color: var(--background-fill-secondary); border: 1px solid var(--border-color-primary); border-radius: 5px; display: flex; justify-content: center; align-items: center; padding: 20px;">']
-        svg.append(f'<svg viewBox="0 0 {width} {height}" style="min-width:{width}px; min-height:{height}px;" xmlns="http://www.w3.org/2000/svg">')
-        svg.append('<defs><pattern id="field" patternUnits="userSpaceOnUse" width="10" height="10"><rect width="10" height="10" fill="#a7c957"/></pattern></defs>')
+        # Add 0.5 padding
+        v_min_x = min_x - 0.5
+        v_min_y = min_y - 0.5
+        v_width = (max_x - min_x + 2) 
+        v_height = (max_y - min_y + 2)
         
+        # We use a fixed aspect ratio container
+        svg = [f'<div id="carcassonne_board" style="width: 100%; height: 500px; background: var(--background-fill-secondary); border: 1px solid var(--border-color-primary); border-radius: 8px; overflow: hidden; display:flex; justify-content:center; align-items:center;">']
+        svg.append(f'<svg viewBox="{v_min_x * cls.TILE_SIZE} {- (max_y + 1) * cls.TILE_SIZE} {v_width * cls.TILE_SIZE} {v_height * cls.TILE_SIZE}" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">')
+        
+        # Render actual tiles
         for (x, y), tile in board.grid.items():
-            px = (x - min_x) * cls.TILE_SIZE
-            # y goes up in coordinates, so we invert it for SVG (0,0 is top-left)
-            py = (max_y - y) * cls.TILE_SIZE
+            px = x * cls.TILE_SIZE
+            py = - (y + 1) * cls.TILE_SIZE
             is_last = (x, y) == last_played
-            svg.append(cls.render_tile(tile, px, py, is_last))
+            svg.append(cls.render_tile(tile, px, py, is_last=is_last))
+            
+        # Render Ghosts
+        if ghost_moves:
+            for mx, my, mrot in ghost_moves:
+                px = mx * cls.TILE_SIZE
+                py = - (my + 1) * cls.TILE_SIZE
+                svg.append(cls.render_ghost(px, py, mx, my))
             
         svg.append('</svg></div>')
-        return "\n".join(svg)
+        
+        # Inject JavaScript to handle clicks on ghosts
+        js = """
+        <script>
+        function placeTile(x, y) {
+            const input = window.parent.document.querySelector('#hidden_coord_input textarea');
+            if (input) {
+                input.value = x + "," + y;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }
+        </script>
+        """
+        return "\n".join(svg) + js
+        
+    @classmethod
+    def render_ghost(cls, px, py, mx, my) -> str:
+        s = cls.TILE_SIZE
+        # Clickable ghost tile
+        return f'<rect x="{px+5}" y="{py+5}" width="{s-10}" height="{s-10}" rx="5" fill="#ffd166" fill-opacity="0.2" stroke="#ffd166" stroke-width="2" stroke-dasharray="5,5" cursor="pointer" onclick="placeTile({mx}, {my})"/>'
+
         
     @classmethod
     def render_tile(cls, tile, px, py, is_last=False) -> str:
@@ -151,6 +187,8 @@ class GameState:
         self.pending_human_turn = False
         self.pending_tile = None
         self.pending_legal_moves = []
+        self.human_selected_rotation = 0
+        self.human_selected_coords = None
 
     def step_forward(self):
         """Advances the game. If it's an AI's turn, it executes it completely. 
@@ -189,6 +227,8 @@ class GameState:
             self.pending_human_turn = True
             self.pending_tile = tile
             self.pending_legal_moves = legal_moves
+            self.human_selected_rotation = 0
+            self.human_selected_coords = None
             self.logs.append(f"👤 <b>WAITING</b> for {self.current_player} (Human) to play <b>{tile.name}</b>.")
             return self.get_ui_state()
             
@@ -202,14 +242,12 @@ class GameState:
         self._execute_placement(tile, tx, ty, rot, meeple_idx)
         return self.get_ui_state()
         
-    def execute_human_move(self, move_str, meeple_str):
-        if not self.pending_human_turn: return self.get_ui_state()
-        
-        # Parse "(x, y) Rot: deg"
-        parts = move_str.split(")")
-        coord = parts[0].replace("(", "").split(",")
-        tx, ty = int(coord[0].strip()), int(coord[1].strip())
-        rot = int(parts[1].split(":")[1].strip())
+    def execute_human_move(self, meeple_str):
+        if not self.pending_human_turn or not self.human_selected_coords: 
+            return self.get_ui_state()
+            
+        tx, ty = map(int, self.human_selected_coords.split(","))
+        rot = self.human_selected_rotation
         
         meeple_idx = None
         if "None" not in meeple_str:
@@ -263,12 +301,17 @@ class GameState:
         return self.get_ui_state()
 
     def get_ui_state(self):
-        # Instead of hardcoded #f4f4f4 background, use CSS variables for light/dark mode compatibility
+        # Determine ghost moves for Human interaction
+        ghost_moves = []
+        if self.pending_human_turn:
+            # Only show ghost moves for the CURRENTLY selected human rotation
+            ghost_moves = [(x, y, r) for x, y, r in self.pending_legal_moves if r == self.human_selected_rotation]
+            
         log_html = "<div style='height:400px; overflow-y:auto; font-family:monospace; background: var(--background-fill-secondary); color: var(--body-text-color); padding:10px; border-radius:5px; border: 1px solid var(--border-color-primary);'>"
         log_html += "<br>".join(reversed(self.logs))
         log_html += "</div>"
         
-        svg = SVG_Renderer.render_board(self.board, getattr(self, "last_played", None))
+        svg = SVG_Renderer.render_board(self.board, getattr(self, "last_played", None), ghost_moves=ghost_moves)
         
         stats = f"""
         ### 📊 Current Score
@@ -280,6 +323,18 @@ class GameState:
         """
         
         return svg, log_html, stats
+
+    def rotate_human_tile(self):
+        if not self.pending_human_turn: return
+        self.human_selected_rotation = (self.human_selected_rotation + 90) % 360
+        # When rotating, reset selected coordinates as they might no longer be legal
+        self.human_selected_coords = None
+        return self.get_ui_state()
+
+    def set_human_coords(self, coords_str):
+        if not self.pending_human_turn: return
+        self.human_selected_coords = coords_str
+        return self.get_ui_state()
 
 _global_state = GameState("Human", "Star2.5")
 
@@ -297,13 +352,13 @@ def _unpack_ui_state(gs):
     if gs.pending_human_turn:
         controls_visible = True
         t = gs.pending_tile
-        # Format tile HTML
+        # Apply rotation to preview
         letter = TILE_LETTER_MAP.get(t.name, "D")
         b64 = ASSETS_CACHE.get(letter)
-        tile_html_val = f'<div style="text-align:center;"><p><b>Draw: {t.name}</b></p><img src="{b64}" width="100" style="margin: 0 auto;"/></div>'
+        rot = gs.human_selected_rotation
+        tile_html_val = f'<div style="text-align:center;"><p><b>Draw: {t.name}</b></p><div style="transform: rotate({rot}deg); transition: transform 0.3s;"><img src="{b64}" width="100" style="margin: 0 auto;"/></div><p>Rotation: {rot}°</p></div>'
         
-        move_choices = [f"({x}, {y}) Rot: {rot}" for x, y, rot in gs.pending_legal_moves]
-        if move_choices: move_val = move_choices[0]
+        coord_val = gs.human_selected_coords or "Click on board!"
         
         meeple_choices = ["None"] + [f"{s.type.name} - {i}" for i, s in enumerate(t.segments)]
         meeple_val = "None"
@@ -311,7 +366,7 @@ def _unpack_ui_state(gs):
     return (
         svg, log, stats,
         gr.update(visible=controls_visible),
-        gr.update(choices=move_choices, value=move_val),
+        gr.update(value=coord_val),
         gr.update(choices=meeple_choices, value=meeple_val),
         gr.update(value=tile_html_val)
     )
@@ -320,9 +375,17 @@ def step_game():
     _global_state.step_forward()
     return _unpack_ui_state(_global_state)
 
-def submit_human(move, meeple):
-    _global_state.execute_human_move(move, meeple)
+def rotate_tile():
+    _global_state.rotate_human_tile()
     return _unpack_ui_state(_global_state)
+
+def set_coords(coords):
+    _global_state.set_human_coords(coords)
+    return _unpack_ui_state(_global_state)
+
+def submit_human(meeple):
+    return _global_state.execute_human_move(meeple)
+
 
 def reset_game(p1, p2, token):
     global _global_state
@@ -365,25 +428,36 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
             # --- HUMAN CONTROLS (Hidden by default) ---
             with gr.Group(visible=False, elem_id="human_controls") as human_panel:
                 gr.Markdown("### 👤 Your Turn!")
-                human_tile_display = gr.HTML()
                 with gr.Row():
-                    human_move_dd = gr.Dropdown(label="Placement (x, y | rotation)")
-                    human_meeple_dd = gr.Dropdown(label="Meeple Target")
-                human_submit = gr.Button("✅ Confirm Move", variant="primary")
+                    human_tile_display = gr.HTML()
+                    with gr.Column():
+                        btn_rotate = gr.Button("🔄 Rotate Tile")
+                        human_coord_display = gr.Markdown("Click a gold spot on the board!")
+                        human_meeple_dd = gr.Dropdown(label="Meeple Target")
+                        human_submit = gr.Button("✅ Confirm Move", variant="primary")
+                
+                # Hidden textbox to receive coordinate clicks from SVG
+                hidden_coords = gr.Textbox(visible=False, elem_id="hidden_coord_input")
                 gr.Markdown("---")
             # ------------------------------------------
             
             logs_view = gr.HTML(value="Logs will appear here.")
             
-    # Function wiring: unpack all 7 outputs: (svg, log, stats, panel_viz, move_dd, meeple_dd, tile_disp)
-    UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_move_dd, human_meeple_dd, human_tile_display]
+    # Function wiring: unpack all 7 outputs: (svg, log, stats, panel_viz, coord_info, meeple_dd, tile_disp)
+    UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_coord_display, human_meeple_dd, human_tile_display]
     
     btn_step.click(fn=step_game, inputs=[], outputs=UI_OUTPUTS)
-    human_submit.click(fn=submit_human, inputs=[human_move_dd, human_meeple_dd], outputs=UI_OUTPUTS)
+    btn_rotate.click(fn=rotate_tile, inputs=[], outputs=UI_OUTPUTS)
+    
+    # Coordinates click handler
+    hidden_coords.change(fn=set_coords, inputs=[hidden_coords], outputs=UI_OUTPUTS)
+    
+    human_submit.click(fn=submit_human, inputs=[human_meeple_dd], outputs=UI_OUTPUTS)
     
     btn_reset.click(fn=reset_game, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
     player1_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
     player2_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
+
     
     def auto_play_10():
         for _ in range(10):
