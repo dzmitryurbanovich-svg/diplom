@@ -359,6 +359,12 @@ _global_state = GameState("Human", "Star2.5")
 def _unpack_ui_state(gs):
     svg, log, stats = gs.get_ui_state()
     
+    # Initialize all UI variables with defaults to prevent UnboundLocalError
+    controls_visible = False
+    coord_val = "None"
+    meeple_choices = ["None"]
+    meeple_val = "None"
+    tile_html_val = "<i>Waiting for turn...</i>"
     hint_val = "Ready. Click 'Next Turn' to proceed."
     
     if gs.pending_human_turn:
