@@ -170,10 +170,13 @@ class GameState:
             elif a_str == "Greedy": self.agents[p_name] = GreedyAgent(p_name)
             else: self.agents[p_name] = None  # None indicates Human
             
+        self.pending_human_turn = False
+        self.pending_tile = None
         self.pending_legal_moves = []
         self.human_selected_rotation = 0
         self.human_selected_coords = None
         self.board_bounds = (0, 0, 0, 0) # Store min_x, max_x, min_y, max_y
+        self.is_running = False
 
     def step_forward(self):
         """Advances the game. If it's an AI's turn, it executes it completely. 
@@ -331,7 +334,9 @@ class GameState:
         # Determine ghost moves for Human interaction
         ghost_moves = []
         human_coord_choices = []
-        if self.pending_human_turn:
+        pending_human = getattr(self, "pending_human_turn", False)
+        
+        if pending_human:
             # Only show ghost moves for the CURRENTLY selected human rotation
             ghost_moves = [(x, y, r) for x, y, r in self.pending_legal_moves if r == self.human_selected_rotation]
             human_coord_choices = [f"{x},{y}" for x, y, r in ghost_moves]
@@ -430,12 +435,41 @@ def handle_board_click(evt: gr.SelectData):
     
     return set_coords(f"{gx},{gy}")
 
+def game_loop():
+    """Generator that runs the game automatically until game over or human turn."""
+    _global_state.is_running = True
+    
+    # Initial state
+    yield _unpack_ui_state(_global_state)
+    
+    while _global_state.is_running:
+        if _global_state.game_over:
+            _global_state.is_running = False
+            yield _unpack_ui_state(_global_state)
+            break
+            
+        if _global_state.pending_human_turn:
+            _global_state.is_running = False
+            _global_state.logs.append("⏳ <b>Your Turn!</b> Please place the tile.")
+            yield _unpack_ui_state(_global_state)
+            break
+            
+        # Step the game
+        _global_state.step_forward()
+        yield _unpack_ui_state(_global_state)
+        
+        # Small delay for visual progression
+        import time
+        time.sleep(0.5)
+
 def set_coords(coords):
     _global_state.set_human_coords(coords)
     return _unpack_ui_state(_global_state)
 
 def submit_human(meeple):
     _global_state.execute_human_move(meeple)
+    # Don't auto-resume here to let user see their move, 
+    # they can click 'Resume' themselves or we can add auto-resume if desired.
     return _unpack_ui_state(_global_state)
 
 
@@ -472,11 +506,10 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
                 player2_dd = gr.Dropdown(choices=AGENT_CHOICES, value="Star2.5", label="🔵 Player 2 AI Mechanism")
                 
             token_input = gr.Textbox(label="Hugging Face Token (Required for Hybrid LLM only)", type="password", placeholder="hf_...", value=os.environ.get("HF_TOKEN", ""))
-            stats_view = gr.Markdown(value="Hit start to begin.")
+            stats_view = gr.Markdown(value="Hit Start to begin.")
             
             with gr.Row():
-                btn_step = gr.Button("▶️ Next Turn", variant="primary")
-                btn_auto = gr.Button("⏩ Auto-Play (x10)", variant="secondary")
+                btn_start = gr.Button("▶️ Start / Resume Game", variant="primary")
                 btn_reset = gr.Button("🔄 Reset Board")
                 
             # --- HUMAN CONTROLS (Hidden by default) ---
@@ -500,7 +533,7 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
     # Function wiring: unpack all 9 outputs
     UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_coord_display, human_meeple_dd, human_tile_display, human_hint_md, human_coord_dd]
     
-    btn_step.click(fn=step_game, inputs=[], outputs=UI_OUTPUTS)
+    btn_start.click(fn=game_loop, inputs=[], outputs=UI_OUTPUTS)
     btn_rotate.click(fn=rotate_tile, inputs=[], outputs=UI_OUTPUTS)
     
     # Coordinates click handler
@@ -512,16 +545,6 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
     btn_reset.click(fn=reset_game, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
     player1_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
     player2_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
-
-    
-    def auto_play_10():
-        for _ in range(10):
-            _global_state.step_forward()
-            if _global_state.game_over or _global_state.pending_human_turn:
-                break
-        return _unpack_ui_state(_global_state)
-        
-    btn_auto.click(fn=auto_play_10, inputs=[], outputs=UI_OUTPUTS)
     
     # Init
     demo.load(fn=reset_game, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
