@@ -457,37 +457,7 @@ def change_agents(p1, p2, token):
 
 AGENT_CHOICES = ["Human", "Greedy", "Star2.5", "MCTS", "Hybrid LLM"]
 
-HEAD_JS = """
-<script>
-window.set_carcassonne_coords = function(x, y) {
-    console.log("Carcassonne API: Setting coords to", x, y);
-    
-    // Ищем именно textarea внутри скрытого компонента
-    const inputArea = document.querySelector('#hidden_coord_input textarea');
-    
-    if (inputArea) {
-        // Вызываем нативный сеттер браузера, чтобы обойти защиту Svelte/Gradio
-        // Это гарантирует, что фреймворк заметит изменение значения
-        const nativeValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
-        nativeValueSetter.call(inputArea, x + "," + y);
-        
-        // Диспатчим событие input, которое Gradio гарантированно поймает
-        inputArea.dispatchEvent(new Event('input', { bubbles: true }));
-    } else {
-        console.error("Не удалось найти скрытое поле для координат (#hidden_coord_input textarea)");
-    }
-};
 
-// Прослушивание сообщений для работы внутри IFrame (Hugging Face)
-window.addEventListener('message', function(event) {
-    if (event.data && event.data.type === 'carcassonne_place') {
-        console.log("Carcassonne BRIDGE: Message received", event.data.coords);
-        const parts = event.data.coords.split(",");
-        window.set_carcassonne_coords(parts[0], parts[1]);
-    }
-});
-</script>
-"""
 
 with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
     gr.Markdown("# 🏰 Carcassonne AI Tournament Engine")
@@ -522,9 +492,6 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
                         human_submit = gr.Button("✅ Confirm Move", variant="primary")
                 human_hint_md = gr.HTML("💡 <b>Hint:</b> Click a gold spot on the board!", elem_classes=["hint-box"])
                 
-                # Hidden textbox to receive coordinate clicks from SVG
-                # We keep it visible=True but use CSS to hide it, ensuring it exists in the DOM
-                hidden_coords = gr.Textbox(visible=True, elem_id="hidden_coord_input", label="Internal Coord", container=False)
                 gr.Markdown("---")
             # ------------------------------------------
             
