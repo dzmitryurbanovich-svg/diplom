@@ -388,7 +388,8 @@ def set_coords(coords):
     return _unpack_ui_state(_global_state)
 
 def submit_human(meeple):
-    return _global_state.execute_human_move(meeple)
+    _global_state.execute_human_move(meeple)
+    return _unpack_ui_state(_global_state)
 
 
 def reset_game(p1, p2, token):
