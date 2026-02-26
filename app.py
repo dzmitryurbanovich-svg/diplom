@@ -91,26 +91,39 @@ class SVG_Renderer:
             
         svg.append('</svg></div>')
         
-        # Inject JavaScript to handle clicks on ghosts
+        # Inject JavaScript to handle clicks AND drops on ghosts
         js = f"""
         <script>
-        function placeTile(x, y) {{
-            console.log("Carcassonne: Clicked ghost at " + x + "," + y);
+        function sendCarcassonneCoord(x, y) {{
             const val = x + "," + y;
-            // Try global function, then local search, then parent search
-            if (window.set_carcassonne_coords) {{
-                window.set_carcassonne_coords(x, y);
-            }} else if (window.parent && window.parent.set_carcassonne_coords) {{
-                window.parent.set_carcassonne_coords(x, y);
-            }} else {{
-                // Emergency fallback selector
-                const input = document.querySelector('#hidden_coord_input textarea') || 
-                              document.querySelector('#hidden_coord_input input');
-                if (input) {{
-                    input.value = val;
-                    input.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                }}
+            console.log("Carcassonne: Sending coord", val);
+            const msg = {{ type: 'carcassonne_place', coords: val }};
+            // 1. Try local update
+            if (window.set_carcassonne_coords) window.set_carcassonne_coords(x, y);
+            // 2. Post to self
+            window.postMessage(msg, '*');
+            // 3. Post to parent (Hugging Face frame)
+            if (window.parent && window.parent !== window) {{
+                window.parent.postMessage(msg, '*');
             }}
+        }}
+
+        function onGhostDrop(event, x, y) {{
+            event.preventDefault();
+            console.log("Carcassonne: Tile dropped at", x, y);
+            sendCarcassonneCoord(x, y);
+            event.target.setAttribute('fill-opacity', '0.7');
+        }}
+
+        function onGhostDragOver(event) {{
+            event.preventDefault();
+            event.target.setAttribute('fill-opacity', '0.9');
+            event.target.setAttribute('stroke-width', '6');
+        }}
+
+        function onGhostDragLeave(event) {{
+            event.target.setAttribute('fill-opacity', '0.3');
+            event.target.setAttribute('stroke-width', '2');
         }}
         </script>
         """
@@ -122,8 +135,14 @@ class SVG_Renderer:
         opacity = "0.7" if is_selected else "0.3"
         stroke_width = "5" if is_selected else "2"
         dash = "none" if is_selected else "5,5"
-        # Clickable ghost tile - ensure pointer-events are on
-        return f'<rect x="{px+2}" y="{py+2}" width="{s-4}" height="{s-4}" rx="10" fill="#ffd166" fill-opacity="{opacity}" stroke="#ffd166" stroke-width="{stroke_width}" stroke-dasharray="{dash}" cursor="pointer" style="pointer-events: all;" onclick="placeTile({mx}, {my})"/>'
+        # Clickable AND Droppable ghost tile
+        return f'''<rect x="{px+2}" y="{py+2}" width="{s-4}" height="{s-4}" rx="10" 
+            fill="#ffd166" fill-opacity="{opacity}" stroke="#ffd166" stroke-width="{stroke_width}" stroke-dasharray="{dash}" 
+            cursor="pointer" style="pointer-events: all;" 
+            onclick="sendCarcassonneCoord({mx}, {my})"
+            ondragover="onGhostDragOver(event)"
+            ondragleave="onGhostDragLeave(event)"
+            ondrop="onGhostDrop(event, {mx}, {my})"/>'''
 
         
     @classmethod
@@ -383,7 +402,17 @@ def _unpack_ui_state(gs):
         letter = TILE_LETTER_MAP.get(t.name, "D")
         b64 = ASSETS_CACHE.get(letter)
         rot = gs.human_selected_rotation
-        tile_html_val = f'<div style="text-align:center;"><p><b>Draw: {t.name}</b></p><div style="transform: rotate({rot}deg); transition: transform 0.3s;"><img src="{b64}" width="100" style="margin: 0 auto;"/></div><p>Rotation: {rot}°</p></div>'
+        rot = gs.human_selected_rotation
+        tile_html_val = f'''
+        <div style="text-align:center;">
+            <p><b>Draw: {t.name}</b></p>
+            <div draggable="true" ondragstart="event.dataTransfer.setData('text/plain', 'tile')" style="cursor: grab; display: inline-block; transform: rotate({rot}deg); transition: transform 0.3s;">
+                <img src="{b64}" width="120" style="margin: 0 auto; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));"/>
+                <p style="font-size: 0.8em; color: #666; margin-top: 5px;">↔️ Drag me to the board!</p>
+            </div>
+            <p>Rotation: {rot}°</p>
+        </div>
+        '''
         
         if not gs.human_selected_coords:
             coord_val = "📍 Click a gold spot on the board!"
@@ -441,18 +470,26 @@ AGENT_CHOICES = ["Human", "Greedy", "Star2.5", "MCTS", "Hybrid LLM"]
 
 HEAD_JS = """
 <script>
+// Global bridge function
 window.set_carcassonne_coords = function(x, y) {
-    console.log("Carcassonne GLOBAL: updating to", x, y);
+    console.log("Carcassonne API: Setting coords to", x, y);
     const input = document.querySelector('#hidden_coord_input textarea') || 
                   document.querySelector('#hidden_coord_input input');
     if (input) {
         input.value = x + "," + y;
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
-    } else {
-        console.error("Carcassonne GLOBAL: input not found!");
     }
 };
+
+// Listen for messages from inside IFrames (for Hugging Face)
+window.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'carcassonne_place') {
+        console.log("Carcassonne BRIDGE: Message received", event.data.coords);
+        const parts = event.data.coords.split(",");
+        window.set_carcassonne_coords(parts[0], parts[1]);
+    }
+});
 </script>
 """
 
