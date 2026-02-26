@@ -346,6 +346,7 @@ class GameState:
                 self.logs.append(f"🤝 <b>It's a TIE ({p1_score} vs {p2_score})!</b>")
         return self.get_ui_state()
 
+    def get_ui_state(self):
         # Determine ghost moves for Human interaction
         ghost_moves = []
         human_coord_choices = []
@@ -496,7 +497,7 @@ window.addEventListener('message', function(event) {
 </script>
 """
 
-with gr.Blocks(title="Carcassonne AI Tournament Viewer", head=HEAD_JS, css="#hidden_coord_input { opacity: 0 !important; height: 0px !important; overflow: hidden !important; pointer-events: none !important; } .hint-box { background: var(--amber-50); padding: 10px; border-radius: 8px; border-left: 4px solid var(--amber-500); margin-top: 10px; }") as demo:
+with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
     gr.Markdown("# 🏰 Carcassonne AI Tournament Engine")
     gr.Markdown("Watch entirely autonomous agents compete in the classic board game, applying heuristic tree search and LLM-driven strategy.")
     
@@ -567,4 +568,9 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer", head=HEAD_JS, css="#hid
     demo.load(fn=reset_game, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.launch(
+        server_name="0.0.0.0", 
+        server_port=7860,
+        head=HEAD_JS,
+        css="#hidden_coord_input { opacity: 0 !important; height: 0px !important; overflow: hidden !important; pointer-events: none !important; } .hint-box { background: var(--amber-50); padding: 10px; border-radius: 8px; border-left: 4px solid var(--amber-500); margin-top: 10px; }"
+    )
