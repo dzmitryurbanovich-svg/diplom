@@ -90,15 +90,17 @@ class PIL_Renderer:
             img = ASSETS_PIL.get(letter)
             
             if img:
+                # Resize to cell size first
+                img_resized = img.resize((cls.TILE_SIZE, cls.TILE_SIZE), Image.LANCZOS)
                 # PIL rotate is counter-clockwise, Carcassonne logic is clockwise. 
                 # Our tile.rotation is 0, 90, 180, 270 clockwise.
-                rotated = img.rotate(-tile.rotation, expand=False, resample=Image.BICUBIC)
+                rotated = img_resized.rotate(-tile.rotation, expand=False, resample=Image.BICUBIC)
                 canvas.paste(rotated, (tx, ty), rotated)
             else:
-                draw.rectangle([tx, ty, tx+cls.TILE_SIZE, ty+cls.TILE_SIZE], fill="grey", outline="white")
+                draw.rectangle([tx, ty, tx+cls.TILE_SIZE-1, ty+cls.TILE_SIZE-1], fill="grey", outline="white")
             
             if (gx, gy) == last_played:
-                draw.rectangle([tx+2, ty+2, tx+cls.TILE_SIZE-2, ty+cls.TILE_SIZE-2], outline="#ffd166", width=5)
+                draw.rectangle([tx+1, ty+1, tx+cls.TILE_SIZE-2, ty+cls.TILE_SIZE-2], outline="#ffd166", width=4)
 
             # Draw Meeples
             for i, seg in enumerate(tile.segments):
@@ -124,12 +126,12 @@ class PIL_Renderer:
                 width = 6 if is_selected else 2
                 
                 # Draw ghost placeholder
-                draw.rectangle([tx+5, ty+5, tx+cls.TILE_SIZE-5, ty+cls.TILE_SIZE-5], 
+                draw.rectangle([tx+3, ty+3, tx+cls.TILE_SIZE-4, ty+cls.TILE_SIZE-4], 
                                outline=(255, 209, 102, opacity), width=width)
                 if is_selected:
                     # Highlight selected ghost
-                    overlay = Image.new("RGBA", (cls.TILE_SIZE-10, cls.TILE_SIZE-10), (255, 209, 102, 40))
-                    canvas.paste(overlay, (tx+5, ty+5), overlay)
+                    overlay = Image.new("RGBA", (cls.TILE_SIZE-6, cls.TILE_SIZE-6), (255, 209, 102, 40))
+                    canvas.paste(overlay, (tx+3, ty+3), overlay)
 
         return canvas, (min_x, max_x, min_y, max_y)
 
@@ -433,7 +435,17 @@ def handle_board_click(evt: gr.SelectData):
     gx = (px // ts) + min_x - 1
     gy = max_y - (py // ts) + 1
     
-    return set_coords(f"{gx},{gy}")
+    # Validation: Only call set_coords if this coordinate is actually a legal move
+    # for the current rotation.
+    legal_coords = [f"{x},{y}" for x, y, r in _global_state.pending_legal_moves if r == _global_state.human_selected_rotation]
+    
+    clicked_coord = f"{gx},{gy}"
+    if clicked_coord in legal_coords:
+        return set_coords(clicked_coord)
+    else:
+        # Ignore invalid clicks or log them
+        _global_state.logs.append(f"⚠️ <b>Invalid Spot:</b> ({gx}, {gy}) is not available for current rotation.")
+        return _unpack_ui_state(_global_state)
 
 def game_loop():
     """Generator that runs the game automatically until game over or human turn."""
