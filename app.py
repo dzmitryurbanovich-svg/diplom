@@ -349,6 +349,10 @@ def _unpack_ui_state(gs):
     meeple_val = None
     tile_html_val = "Waiting..."
     
+    coord_val = "None"
+    meeple_choices = ["None"]
+    meeple_val = "None"
+    
     if gs.pending_human_turn:
         controls_visible = True
         t = gs.pending_tile
