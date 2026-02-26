@@ -49,7 +49,7 @@ class SVG_Renderer:
     TILE_SIZE = 100
     
     @classmethod
-    def render_board(cls, board: Board) -> str:
+    def render_board(cls, board: Board, last_played=None) -> str:
         if not board.grid:
             return "<div style='text-align:center; padding:50px; color:#666;'>Game has not started.</div>"
             
@@ -61,20 +61,22 @@ class SVG_Renderer:
         width = (max_x - min_x + 1) * cls.TILE_SIZE
         height = (max_y - min_y + 1) * cls.TILE_SIZE
         
-        svg = [f'<svg viewBox="0 0 {width} {height}" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">']
+        svg = [f'<div style="width: 100%; max-height: 550px; overflow: auto; background-color: var(--background-fill-secondary); border: 1px solid var(--border-color-primary); border-radius: 5px; display: flex; justify-content: center; align-items: center; padding: 20px;">']
+        svg.append(f'<svg viewBox="0 0 {width} {height}" style="min-width:{width}px; min-height:{height}px;" xmlns="http://www.w3.org/2000/svg">')
         svg.append('<defs><pattern id="field" patternUnits="userSpaceOnUse" width="10" height="10"><rect width="10" height="10" fill="#a7c957"/></pattern></defs>')
         
         for (x, y), tile in board.grid.items():
             px = (x - min_x) * cls.TILE_SIZE
             # y goes up in coordinates, so we invert it for SVG (0,0 is top-left)
             py = (max_y - y) * cls.TILE_SIZE
-            svg.append(cls.render_tile(tile, px, py))
+            is_last = (x, y) == last_played
+            svg.append(cls.render_tile(tile, px, py, is_last))
             
-        svg.append('</svg>')
+        svg.append('</svg></div>')
         return "\n".join(svg)
         
     @classmethod
-    def render_tile(cls, tile, px, py) -> str:
+    def render_tile(cls, tile, px, py, is_last=False) -> str:
         s = cls.TILE_SIZE
         
         g = [f'<g transform="translate({px}, {py})">']
@@ -88,6 +90,9 @@ class SVG_Renderer:
             g.append(f'<image href="{b64_img}" width="{s}" height="{s}" transform="rotate({rot} {s/2} {s/2})"/>')
         else:
             g.append(f'<rect width="{s}" height="{s}" fill="#ccc" stroke="#333"/>')
+            
+        if is_last:
+            g.append(f'<rect width="{s}" height="{s}" fill="none" stroke="#ffd166" stroke-width="6" stroke-dasharray="10,5"/>')
             
         # Draw Meeples
         for i, seg in enumerate(tile.segments):
@@ -131,6 +136,7 @@ class GameState:
         self.logs = ["[Game Started] Starter tile placed at (0, 0)."]
         self.current_player = "Player1"
         self.game_over = False
+        self.last_played = (0, 0)
         
         self.p1_str = p1_str
         self.p2_str = p2_str
@@ -198,6 +204,7 @@ class GameState:
                 
             tile.rotate(rot // 90)
             self.board.place_tile(tx, ty, tile)
+            self.last_played = (tx, ty)
             self.logs.append(f"[{self.current_player}] Placed <b>{tile.name}</b> at ({tx}, {ty}) with rot {rot}.")
             
             # Place Meeple logic
@@ -224,7 +231,7 @@ class GameState:
         log_html += "<br>".join(reversed(self.logs))
         log_html += "</div>"
         
-        svg = SVG_Renderer.render_board(self.board)
+        svg = SVG_Renderer.render_board(self.board, getattr(self, "last_played", None))
         
         stats = f"""
         ### 📊 Current Score
