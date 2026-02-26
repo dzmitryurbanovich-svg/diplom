@@ -49,7 +49,7 @@ class SVG_Renderer:
     TILE_SIZE = 100
     
     @classmethod
-    def render_board(cls, board, last_played=None, ghost_moves=None) -> str:
+    def render_board(cls, board, last_played=None, ghost_moves=None, selected_coords=None) -> str:
         if not board.grid and not ghost_moves:
             return "<div style='text-align:center; padding:50px; color:#666;'>Game has not started.</div>"
             
@@ -64,15 +64,15 @@ class SVG_Renderer:
         min_y = min(y for x, y in all_points)
         max_y = max(y for x, y in all_points)
         
-        # Add 0.5 padding
-        v_min_x = min_x - 0.5
-        v_min_y = min_y - 0.5
-        v_width = (max_x - min_x + 2) 
-        v_height = (max_y - min_y + 2)
+        # Add 1.0 padding to ensure visibility of ghosts and edges
+        v_min_x = min_x - 1.0
+        v_min_y = min_y - 1.0
+        v_width = (max_x - min_x + 3) 
+        v_height = (max_y - min_y + 3)
         
         # We use a fixed aspect ratio container
-        svg = [f'<div id="carcassonne_board" style="width: 100%; height: 500px; background: var(--background-fill-secondary); border: 1px solid var(--border-color-primary); border-radius: 8px; overflow: hidden; display:flex; justify-content:center; align-items:center;">']
-        svg.append(f'<svg viewBox="{v_min_x * cls.TILE_SIZE} {- (max_y + 1) * cls.TILE_SIZE} {v_width * cls.TILE_SIZE} {v_height * cls.TILE_SIZE}" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">')
+        svg = [f'<div id="carcassonne_board" style="width: 100%; height: 500px; background: var(--background-fill-secondary); border: 2px solid var(--border-color-primary); border-radius: 12px; overflow: hidden; display:flex; justify-content:center; align-items:center;">']
+        svg.append(f'<svg viewBox="{v_min_x * cls.TILE_SIZE} {- (max_y + 1.5) * cls.TILE_SIZE} {v_width * cls.TILE_SIZE} {v_height * cls.TILE_SIZE}" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">')
         
         # Render actual tiles
         for (x, y), tile in board.grid.items():
@@ -86,15 +86,18 @@ class SVG_Renderer:
             for mx, my, mrot in ghost_moves:
                 px = mx * cls.TILE_SIZE
                 py = - (my + 1) * cls.TILE_SIZE
-                svg.append(cls.render_ghost(px, py, mx, my))
+                is_selected = f"{mx},{my}" == selected_coords
+                svg.append(cls.render_ghost(px, py, mx, my, is_selected=is_selected))
             
         svg.append('</svg></div>')
         
         # Inject JavaScript to handle clicks on ghosts
+        # Use a more robust selector that traverses up if needed
         js = """
         <script>
         function placeTile(x, y) {
-            const input = window.parent.document.querySelector('#hidden_coord_input textarea');
+            const input = document.querySelector('#hidden_coord_input textarea') || 
+                          window.parent.document.querySelector('#hidden_coord_input textarea');
             if (input) {
                 input.value = x + "," + y;
                 input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -105,10 +108,13 @@ class SVG_Renderer:
         return "\n".join(svg) + js
         
     @classmethod
-    def render_ghost(cls, px, py, mx, my) -> str:
+    def render_ghost(cls, px, py, mx, my, is_selected=False) -> str:
         s = cls.TILE_SIZE
+        opacity = "0.6" if is_selected else "0.2"
+        stroke_width = "4" if is_selected else "2"
+        dash = "none" if is_selected else "5,5"
         # Clickable ghost tile
-        return f'<rect x="{px+5}" y="{py+5}" width="{s-10}" height="{s-10}" rx="5" fill="#ffd166" fill-opacity="0.2" stroke="#ffd166" stroke-width="2" stroke-dasharray="5,5" cursor="pointer" onclick="placeTile({mx}, {my})"/>'
+        return f'<rect x="{px+5}" y="{py+5}" width="{s-10}" height="{s-10}" rx="8" fill="#ffd166" fill-opacity="{opacity}" stroke="#ffd166" stroke-width="{stroke_width}" stroke-dasharray="{dash}" cursor="pointer" onclick="placeTile({mx}, {my})"/>'
 
         
     @classmethod
@@ -243,15 +249,27 @@ class GameState:
         return self.get_ui_state()
         
     def execute_human_move(self, meeple_str):
-        if not self.pending_human_turn or not self.human_selected_coords: 
-            return self.get_ui_state()
+        if not self.pending_human_turn:
+            return 
             
-        tx, ty = map(int, self.human_selected_coords.split(","))
+        if not self.human_selected_coords:
+            self.logs.append("⚠️ <b>Alert:</b> Please select a location on the board first! Click one of the gold ghost tiles.")
+            return 
+            
+        try:
+            tx, ty = map(int, self.human_selected_coords.split(","))
+        except:
+            self.logs.append("⚠️ <b>Error:</b> Invalid coordinates selected. Please try again.")
+            return
+            
         rot = self.human_selected_rotation
         
         meeple_idx = None
-        if "None" not in meeple_str:
-            meeple_idx = int(meeple_str.split(" ")[-1])
+        if meeple_str and "None" not in meeple_str:
+            try:
+                meeple_idx = int(meeple_str.split(" ")[-1])
+            except:
+                meeple_idx = None
             
         self._execute_placement(self.pending_tile, tx, ty, rot, meeple_idx)
         self.pending_human_turn = False
@@ -311,7 +329,7 @@ class GameState:
         log_html += "<br>".join(reversed(self.logs))
         log_html += "</div>"
         
-        svg = SVG_Renderer.render_board(self.board, getattr(self, "last_played", None), ghost_moves=ghost_moves)
+        svg = SVG_Renderer.render_board(self.board, getattr(self, "last_played", None), ghost_moves=ghost_moves, selected_coords=self.human_selected_coords)
         
         stats = f"""
         ### 📊 Current Score
@@ -341,17 +359,7 @@ _global_state = GameState("Human", "Star2.5")
 def _unpack_ui_state(gs):
     svg, log, stats = gs.get_ui_state()
     
-    # Process Human Panel overrides
-    controls_visible = False
-    move_choices = []
-    meeple_choices = []
-    move_val = None
-    meeple_val = None
-    tile_html_val = "Waiting..."
-    
-    coord_val = "None"
-    meeple_choices = ["None"]
-    meeple_val = "None"
+    hint_val = "Ready. Click 'Next Turn' to proceed."
     
     if gs.pending_human_turn:
         controls_visible = True
@@ -362,7 +370,12 @@ def _unpack_ui_state(gs):
         rot = gs.human_selected_rotation
         tile_html_val = f'<div style="text-align:center;"><p><b>Draw: {t.name}</b></p><div style="transform: rotate({rot}deg); transition: transform 0.3s;"><img src="{b64}" width="100" style="margin: 0 auto;"/></div><p>Rotation: {rot}°</p></div>'
         
-        coord_val = gs.human_selected_coords or "Click on board!"
+        if not gs.human_selected_coords:
+            coord_val = "📍 Click a gold spot on the board!"
+            hint_val = "💡 <b>Tip:</b> If you don't see any gold spots, try <b>🔄 Rotating</b> the tile to find a match!"
+        else:
+            coord_val = f"✅ Selected: **({gs.human_selected_coords})**"
+            hint_val = "📝 <b>Next:</b> Choose if you want to place a 👤 <b>Meeple</b>, then click <b>Confirm Move</b>."
         
         meeple_choices = ["None"] + [f"{s.type.name} - {i}" for i, s in enumerate(t.segments)]
         meeple_val = "None"
@@ -372,7 +385,8 @@ def _unpack_ui_state(gs):
         gr.update(visible=controls_visible),
         gr.update(value=coord_val),
         gr.update(choices=meeple_choices, value=meeple_val),
-        gr.update(value=tile_html_val)
+        gr.update(value=tile_html_val),
+        gr.update(value=hint_val)
     )
 
 def step_game():
@@ -441,6 +455,8 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
                         human_meeple_dd = gr.Dropdown(label="Meeple Target")
                         human_submit = gr.Button("✅ Confirm Move", variant="primary")
                 
+                human_hint_md = gr.HTML("💡 <b>Hint:</b> Click a gold spot on the board!", elem_classes=["hint-box"])
+                
                 # Hidden textbox to receive coordinate clicks from SVG
                 hidden_coords = gr.Textbox(visible=False, elem_id="hidden_coord_input")
                 gr.Markdown("---")
@@ -448,8 +464,8 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
             
             logs_view = gr.HTML(value="Logs will appear here.")
             
-    # Function wiring: unpack all 7 outputs: (svg, log, stats, panel_viz, coord_info, meeple_dd, tile_disp)
-    UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_coord_display, human_meeple_dd, human_tile_display]
+    # Function wiring: unpack all 8 outputs: (svg, log, stats, panel_viz, coord_info, meeple_dd, tile_disp, hint)
+    UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_coord_display, human_meeple_dd, human_tile_display, human_hint_md]
     
     btn_step.click(fn=step_game, inputs=[], outputs=UI_OUTPUTS)
     btn_rotate.click(fn=rotate_tile, inputs=[], outputs=UI_OUTPUTS)
