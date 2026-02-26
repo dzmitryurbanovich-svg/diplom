@@ -145,33 +145,21 @@ class GameState:
             if a_str == "Star2.5": self.agents[p_name] = StarAgent(p_name)
             elif a_str == "MCTS": self.agents[p_name] = MCTSAgent(p_name)
             elif a_str == "Hybrid LLM": self.agents[p_name] = HybridLLMAgent(p_name, hf_token)
-            else: self.agents[p_name] = GreedyAgent(p_name)
+            elif a_str == "Greedy": self.agents[p_name] = GreedyAgent(p_name)
+            else: self.agents[p_name] = None  # None indicates Human
+            
+        self.pending_human_turn = False
+        self.pending_tile = None
+        self.pending_legal_moves = []
 
-    def play_turn(self):
+    def step_forward(self):
+        """Advances the game. If it's an AI's turn, it executes it completely. 
+        If it's a Human's turn, it halts and sets up the human turn state."""
         if not self.deck or self.game_over:
-            if not self.game_over:
-                self.game_over = True
-                
-                # End game scoring
-                final_scores = self.board.calculate_final_scores()
-                for score in final_scores:
-                    for player, count in score["meeples"].items():
-                        # If multiple players tie, they all get pts.
-                        self.scores[player] += score["points"]
-                
-                self.logs.append(f"<b>[GAME OVER]</b> Final Scoring computed.")
-                
-                # Announce Winner
-                p1_score = self.scores["Player1"]
-                p2_score = self.scores["Player2"]
-                if p1_score > p2_score:
-                    self.logs.append(f"🏆 <b>Winner is Player 1 ({p1_score} vs {p2_score})!</b>")
-                elif p2_score > p1_score:
-                    self.logs.append(f"🏆 <b>Winner is Player 2 ({p2_score} vs {p1_score})!</b>")
-                else:
-                    self.logs.append(f"🤝 <b>It's a TIE ({p1_score} vs {p2_score})!</b>")
-                    
-            return self.get_ui_state()
+            return self._end_game()
+            
+        if self.pending_human_turn:
+            return self.get_ui_state() # User clicked next but hasn't submitted
             
         tile = self.deck.pop(0)
         
@@ -192,37 +180,86 @@ class GameState:
                     
         if not legal_moves:
             self.logs.append(f"[{self.current_player}] Drew {tile.name} but no legal moves. Discarded.")
-        else:
-            agent = self.agents[self.current_player]
+            self._switch_player()
+            return self.get_ui_state()
             
-            # Use specific signature if it's HybridLLMAgent to pass remaining tiles
-            if isinstance(agent, HybridLLMAgent):
-                tx, ty, rot, meeple_idx = agent.select_move(self.board, tile, legal_moves, self.meeples[self.current_player], len(self.deck))
-                self.logs.append(f"🤖 <b>[LLM THINKING]</b> {self.current_player} (Hybrid LLM) analyzed board.")
-            else:
-                tx, ty, rot, meeple_idx = agent.select_move(self.board, tile, legal_moves, self.meeples[self.current_player])
-                
-            tile.rotate(rot // 90)
-            self.board.place_tile(tx, ty, tile)
-            self.last_played = (tx, ty)
-            self.logs.append(f"[{self.current_player}] Placed <b>{tile.name}</b> at ({tx}, {ty}) with rot {rot}.")
-            
-            # Place Meeple logic
-            if meeple_idx is not None and self.meeples[self.current_player] > 0:
-                if self.board.place_meeple(tx, ty, meeple_idx, self.current_player):
-                    self.meeples[self.current_player] -= 1
-                    self.logs.append(f"[{self.current_player}] Placed MEEPLE on feature at ({tx}, {ty}).")
+        agent = self.agents[self.current_player]
         
-        # End game step computations
+        if agent is None:  # Human
+            self.pending_human_turn = True
+            self.pending_tile = tile
+            self.pending_legal_moves = legal_moves
+            self.logs.append(f"👤 <b>WAITING</b> for {self.current_player} (Human) to play <b>{tile.name}</b>.")
+            return self.get_ui_state()
+            
+        # AI Turn Execution
+        if isinstance(agent, HybridLLMAgent):
+            tx, ty, rot, meeple_idx = agent.select_move(self.board, tile, legal_moves, self.meeples[self.current_player], len(self.deck))
+            self.logs.append(f"🤖 <b>[LLM THINKING]</b> {self.current_player} (Hybrid LLM) analyzed board.")
+        else:
+            tx, ty, rot, meeple_idx = agent.select_move(self.board, tile, legal_moves, self.meeples[self.current_player])
+            
+        self._execute_placement(tile, tx, ty, rot, meeple_idx)
+        return self.get_ui_state()
+        
+    def execute_human_move(self, move_str, meeple_str):
+        if not self.pending_human_turn: return self.get_ui_state()
+        
+        # Parse "(x, y) Rot: deg"
+        parts = move_str.split(")")
+        coord = parts[0].replace("(", "").split(",")
+        tx, ty = int(coord[0].strip()), int(coord[1].strip())
+        rot = int(parts[1].split(":")[1].strip())
+        
+        meeple_idx = None
+        if "None" not in meeple_str:
+            meeple_idx = int(meeple_str.split(" ")[-1])
+            
+        self._execute_placement(self.pending_tile, tx, ty, rot, meeple_idx)
+        self.pending_human_turn = False
+        self.pending_tile = None
+        self.pending_legal_moves = []
+        return self.get_ui_state()
+
+    def _execute_placement(self, tile, tx, ty, rot, meeple_idx):
+        tile.rotate(rot // 90)
+        self.board.place_tile(tx, ty, tile)
+        self.last_played = (tx, ty)
+        self.logs.append(f"[{self.current_player}] Placed <b>{tile.name}</b> at ({tx}, {ty}) with rot {rot}.")
+        
+        if meeple_idx is not None and self.meeples[self.current_player] > 0:
+            if self.board.place_meeple(tx, ty, meeple_idx, self.current_player):
+                self.meeples[self.current_player] -= 1
+                self.logs.append(f"[{self.current_player}] Placed MEEPLE on feature at ({tx}, {ty}).")
+                
         completed = self.board.get_completed_features()
         for comp in completed:
             for player, count in comp["meeples"].items():
                 self.scores[player] += comp["points"]
                 self.meeples[player] += count
                 self.logs.append(f"🎉 <b>Feature Completed:</b> {comp['type']} (+{comp['points']} pts for {player}). Meeple returned.")
-
-        # Switch player
+                
+        self._switch_player()
+        
+    def _switch_player(self):
         self.current_player = "Player2" if self.current_player == "Player1" else "Player1"
+        
+    def _end_game(self):
+        if not self.game_over:
+            self.game_over = True
+            final_scores = self.board.calculate_final_scores()
+            for score in final_scores:
+                for player, count in score["meeples"].items():
+                    self.scores[player] += score["points"]
+            self.logs.append(f"<b>[GAME OVER]</b> Final Scoring computed.")
+            p1_score = self.scores["Player1"]
+            p2_score = self.scores["Player2"]
+            if p1_score > p2_score:
+                self.logs.append(f"🏆 <b>Winner is Player 1 ({p1_score} vs {p2_score})!</b>")
+            elif p2_score > p1_score:
+                self.logs.append(f"🏆 <b>Winner is Player 2 ({p2_score} vs {p1_score})!</b>")
+            else:
+                self.logs.append(f"🤝 <b>It's a TIE ({p1_score} vs {p2_score})!</b>")
         return self.get_ui_state()
 
     def get_ui_state(self):
@@ -244,15 +281,53 @@ class GameState:
         
         return svg, log_html, stats
 
-_global_state = GameState()
+_global_state = GameState("Human", "Star2.5")
+
+def _unpack_ui_state(gs):
+    svg, log, stats = gs.get_ui_state()
+    
+    # Process Human Panel overrides
+    controls_visible = False
+    move_choices = []
+    meeple_choices = []
+    move_val = None
+    meeple_val = None
+    tile_html_val = "Waiting..."
+    
+    if gs.pending_human_turn:
+        controls_visible = True
+        t = gs.pending_tile
+        # Format tile HTML
+        letter = TILE_LETTER_MAP.get(t.name, "D")
+        b64 = ASSETS_CACHE.get(letter)
+        tile_html_val = f'<div style="text-align:center;"><p><b>Draw: {t.name}</b></p><img src="{b64}" width="100" style="margin: 0 auto;"/></div>'
+        
+        move_choices = [f"({x}, {y}) Rot: {rot}" for x, y, rot in gs.pending_legal_moves]
+        if move_choices: move_val = move_choices[0]
+        
+        meeple_choices = ["None"] + [f"{s.type.name} - {i}" for i, s in enumerate(t.segments)]
+        meeple_val = "None"
+        
+    return (
+        svg, log, stats,
+        gr.update(visible=controls_visible),
+        gr.update(choices=move_choices, value=move_val),
+        gr.update(choices=meeple_choices, value=meeple_val),
+        gr.update(value=tile_html_val)
+    )
 
 def step_game():
-    return _global_state.play_turn()
+    _global_state.step_forward()
+    return _unpack_ui_state(_global_state)
+
+def submit_human(move, meeple):
+    _global_state.execute_human_move(move, meeple)
+    return _unpack_ui_state(_global_state)
 
 def reset_game(p1, p2, token):
     global _global_state
     _global_state = GameState(p1, p2, token)
-    return _global_state.get_ui_state()
+    return _unpack_ui_state(_global_state)
 
 def change_agents(p1, p2, token):
     _global_state.p1_str = p1
@@ -261,10 +336,11 @@ def change_agents(p1, p2, token):
         if a_str == "Star2.5": _global_state.agents[p_name] = StarAgent(p_name)
         elif a_str == "MCTS": _global_state.agents[p_name] = MCTSAgent(p_name)
         elif a_str == "Hybrid LLM": _global_state.agents[p_name] = HybridLLMAgent(p_name, token)
-        else: _global_state.agents[p_name] = GreedyAgent(p_name)
-    return _global_state.get_ui_state()
+        elif a_str == "Greedy": _global_state.agents[p_name] = GreedyAgent(p_name)
+        else: _global_state.agents[p_name] = None
+    return _unpack_ui_state(_global_state)
 
-AGENT_CHOICES = ["Greedy", "Star2.5", "MCTS", "Hybrid LLM"]
+AGENT_CHOICES = ["Human", "Greedy", "Star2.5", "MCTS", "Hybrid LLM"]
 
 with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
     gr.Markdown("# 🏰 Carcassonne AI Tournament Engine")
@@ -285,26 +361,41 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
                 btn_step = gr.Button("▶️ Next Turn", variant="primary")
                 btn_auto = gr.Button("⏩ Auto-Play (x10)", variant="secondary")
                 btn_reset = gr.Button("🔄 Reset Board")
+                
+            # --- HUMAN CONTROLS (Hidden by default) ---
+            with gr.Group(visible=False, elem_id="human_controls") as human_panel:
+                gr.Markdown("### 👤 Your Turn!")
+                human_tile_display = gr.HTML()
+                with gr.Row():
+                    human_move_dd = gr.Dropdown(label="Placement (x, y | rotation)")
+                    human_meeple_dd = gr.Dropdown(label="Meeple Target")
+                human_submit = gr.Button("✅ Confirm Move", variant="primary")
+                gr.Markdown("---")
+            # ------------------------------------------
             
             logs_view = gr.HTML(value="Logs will appear here.")
             
-    btn_step.click(fn=step_game, inputs=[], outputs=[board_view, logs_view, stats_view])
-    btn_reset.click(fn=reset_game, inputs=[player1_dd, player2_dd, token_input], outputs=[board_view, logs_view, stats_view])
+    # Function wiring: unpack all 7 outputs: (svg, log, stats, panel_viz, move_dd, meeple_dd, tile_disp)
+    UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_move_dd, human_meeple_dd, human_tile_display]
     
-    # Real-time UI updates for dropdown changes
-    player1_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd, token_input], outputs=[board_view, logs_view, stats_view])
-    player2_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd, token_input], outputs=[board_view, logs_view, stats_view])
+    btn_step.click(fn=step_game, inputs=[], outputs=UI_OUTPUTS)
+    human_submit.click(fn=submit_human, inputs=[human_move_dd, human_meeple_dd], outputs=UI_OUTPUTS)
+    
+    btn_reset.click(fn=reset_game, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
+    player1_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
+    player2_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
     
     def auto_play_10():
         for _ in range(10):
-            r1, r2, r3 = _global_state.play_turn()
-            if _global_state.game_over: break
-        return r1, r2, r3
+            _global_state.step_forward()
+            if _global_state.game_over or _global_state.pending_human_turn:
+                break
+        return _unpack_ui_state(_global_state)
         
-    btn_auto.click(fn=auto_play_10, inputs=[], outputs=[board_view, logs_view, stats_view])
+    btn_auto.click(fn=auto_play_10, inputs=[], outputs=UI_OUTPUTS)
     
     # Init
-    demo.load(fn=reset_game, inputs=[player1_dd, player2_dd, token_input], outputs=[board_view, logs_view, stats_view])
+    demo.load(fn=reset_game, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
 
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7860)
