@@ -55,29 +55,17 @@ class UserAuthManager:
         token = secrets.token_hex(4).upper() # 8-char code
         db[email] = {
             "pwd": hashlib.sha256(password.encode()).hexdigest(),
-            "verified": False,
+            "verified": True, # Automatically verified for now
             "token": token
         }
         cls._save(db)
         
-        # Mock email sending
-        print(f"\n[EMAIL MOCK] To: {email}")
-        print(f"[EMAIL MOCK] Subject: Verify your account")
-        print(f"[EMAIL MOCK] Message: Your verification code is: {token}")
-        print(f"[EMAIL MOCK] Link: http://localhost:7860/?verify={token}\n")
-        
-        return f"✅ Registered! A verification code was sent to {email}. Please enter it below or check logs."
+        return f"✅ Registered successfully! You can now login with {email}."
 
     @classmethod
     def verify_token(cls, email, token):
-        db = cls._load()
-        if email not in db: return "❌ Email not found."
-        user = db[email]
-        if user["token"] == token.strip().upper():
-            user["verified"] = True
-            cls._save(db)
-            return "✅ Account verified! You can now login."
-        return "❌ Invalid verification code."
+        # Kept for compatibility but verification is now automatic
+        return "✅ Account verified!"
 
     @classmethod
     def login(cls, email, password):
@@ -86,8 +74,7 @@ class UserAuthManager:
         user = db[email]
         if user["pwd"] != hashlib.sha256(password.encode()).hexdigest():
             return False, "❌ Incorrect password."
-        if not user.get("verified", False):
-            return False, "⚠️ Account not verified. Please check your email."
+        # Verification check removed per user request
         return True, "✅ Success"
 
 def load_assets():
@@ -680,16 +667,13 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
         success, msg = UserAuthManager.login(email, pwd)
         if success:
             return gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), ""
-        
-        if "Account not verified" in msg:
-            return gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), msg
-            
         return gr.update(), gr.update(), gr.update(), msg
 
     def handle_register(email, pwd):
         msg = UserAuthManager.register(email, pwd)
         if "✅" in msg:
-            return email, gr.update(visible=False), gr.update(visible=True), msg
+            # Bypass verify_p, stay in login_p but show success
+            return email, gr.update(visible=True), gr.update(visible=False), msg
         return "", gr.update(), gr.update(), msg
 
     def handle_verify(email, code):
