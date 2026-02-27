@@ -3,6 +3,7 @@ import copy
 from typing import Tuple, List, Optional
 from src.logic.models import Tile
 from src.logic.engine import Board
+from src.mcp.prompts import SYSTEM_PROMPT, TOT_PROMPT_TEMPLATE
 
 class CarcassonneAgent:
     def __init__(self, name: str):
@@ -114,23 +115,19 @@ class HybridLLMAgent(CarcassonneAgent):
         super().__init__(name)
         self.token = hf_token
 
-    def _get_llm_strategy(self, board_text: str, current_meeples: int, remaining_tiles: int) -> str:
+    def _get_llm_strategy(self, tile_name: str, legal_moves: List, current_meeples: int, remaining_tiles: int) -> str:
         if not self.token.strip(): return "GREEDY"
         
-        prompt = (
-            f"<s>[INST] You are an expert Carcassonne AI. Analyze the board and resources.\n\n"
-            f"Board Map:\n{board_text}\n\n"
-            f"Resources:\n- Your Meeples: {current_meeples}/7\n- Tiles left: {remaining_tiles}/72\n\n"
-            f"Rules:\n"
-            f"- If Meeples < 2 and Tiles > 30, SAVE meeples (choose GREEDY).\n"
-            f"- If Meeples >= 2, choose CITY to score big points.\n"
-            f"- If board is empty, choose ROAD or CITY.\n"
-            f"Choose your macro-strategy for this turn:\n"
-            f"  CITY  - Try to complete cities\n"
-            f"  ROAD  - Build roads\n"
-            f"  GREEDY - Just place tile, save meeples\n\n"
-            f"Reply with exactly ONE word (CITY, ROAD, or GREEDY): [/INST]"
+        # Use the official research prompts from src/mcp/prompts.py
+        user_content = TOT_PROMPT_TEMPLATE.format(
+            tile_name=tile_name,
+            legal_moves=str(legal_moves[:10]) # Limiting to 10 for prompt efficiency
         )
+        # Combine with some strategic context
+        prompt = f"<s>[INST] <<SYS>>\n{SYSTEM_PROMPT}\n<</SYS>>\n\n{user_content}\n" \
+                 f"Analyze the board and choose a macro-strategy: CITY, ROAD, or GREEDY. " \
+                 f"Resources: {current_meeples} meeples, {remaining_tiles} tiles left. " \
+                 f"Reply with exactly ONE word (CITY, ROAD, or GREEDY): [/INST]"
         
         headers = {"Authorization": f"Bearer {self.token.strip()}"}
         payload = {"inputs": prompt, "parameters": {"return_full_text": False, "max_new_tokens": 5, "stop": ["\n", " "]} }
@@ -152,7 +149,7 @@ class HybridLLMAgent(CarcassonneAgent):
             return 0, 0, 0, None
             
         board_txt = board.render_ascii()
-        strategy = self._get_llm_strategy(board_txt, current_meeples, remaining_tiles)
+        strategy = self._get_llm_strategy(tile.name, legal_moves, current_meeples, remaining_tiles)
         
         # Apply the strategy heuristically
         best_move = legal_moves[0]
