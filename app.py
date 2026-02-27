@@ -359,24 +359,6 @@ class GameState:
                 self.logs.append(f"🤝 <b>It's a TIE ({p1_score} vs {p2_score})!</b>")
         return self.get_ui_state()
 
-        log_html = "<div style='height:200px; overflow-y:auto; font-family:monospace; background: var(--background-fill-secondary); color: var(--body-text-color); padding:10px; border-radius:5px; border: 1px solid var(--border-color-primary);'>"
-        log_html += "<br>".join(reversed(self.logs))
-        log_html += "</div>"
-        
-        img_obj, bounds = PIL_Renderer.render_board(self.board, getattr(self, "last_played", None), ghost_moves=ghost_moves, selected_coords=self.human_selected_coords)
-        self.board_bounds = bounds
-        
-        stats = f"""
-        ### 📊 Current Score
-        - 🔴 **Player 1** ({self.p1_str}): {self.scores['Player1']} pts *(Meeples: {self.meeples['Player1']}/7)*
-        - 🔵 **Player 2** ({self.p2_str}): {self.scores['Player2']} pts *(Meeples: {self.meeples['Player2']}/7)*
-        
-        **Tiles remaining:** {len(self.deck)}/72
-        **Current Turn:** {self.current_player}
-        """
-        
-        return img_obj, log_html, stats
-
     def rotate_human_tile(self):
         if not self.pending_human_turn: return
         self.human_selected_rotation = (self.human_selected_rotation + 90) % 360
@@ -400,7 +382,7 @@ class GameState:
             ghost_moves = [(x, y, r) for x, y, r in self.pending_legal_moves if r == self.human_selected_rotation]
             human_coord_choices = [f"{x},{y}" for x, y, r in ghost_moves]
             
-        log_html = "<div style='height:200px; overflow-y:auto; font-family:monospace; background: var(--background-fill-secondary); color: var(--body-text-color); padding:10px; border-radius:5px; border: 1px solid var(--border-color-primary);'>"
+        log_html = "<div style='height:180px; overflow-y:auto; font-family:monospace; background: var(--background-fill-secondary); color: var(--body-text-color); padding:10px; border-radius:5px; border: 1px solid var(--border-color-primary);'>"
         log_html += "<br>".join(reversed(self.logs))
         log_html += "</div>"
         
