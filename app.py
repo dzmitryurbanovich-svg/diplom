@@ -12,6 +12,14 @@ import io
 ASSETS_CACHE = {}
 ASSETS_PIL = {}
 
+# Pre-load HF Token for persistence
+HF_TOKEN_DEFAULT = os.environ.get("HF_TOKEN", "")
+if not HF_TOKEN_DEFAULT and os.path.exists(".hf_token"):
+    try:
+        with open(".hf_token", "r") as f:
+            HF_TOKEN_DEFAULT = f.read().strip()
+    except: pass
+
 def load_assets():
     tiles_dir = "assets/tiles"
     base_names = "ABCDEFGHIJKLMNOPQRSTUVWX"
@@ -160,13 +168,13 @@ class PIL_Renderer:
         for x in range(min_x - 1, max_x + 2):
             tx, _ = get_t_pos(x, max_y + 1)
             draw.line([tx, 0, tx, height_tiles * cls.TILE_SIZE], fill=grid_color, width=1)
-            draw.text((tx + 5, 5), f"x:{x}", fill=label_color)
+            draw.text((tx + 5, 5), str(x), fill=label_color)
             
         # Horizontal lines and Y labels
         for y in range(min_y - 1, max_y + 2):
             _, ty = get_t_pos(min_x - 1, y)
             draw.line([0, ty, width_tiles * cls.TILE_SIZE, ty], fill=grid_color, width=1)
-            draw.text((5, ty + 5), f"y:{y}", fill=label_color)
+            draw.text((5, ty + 5), str(y), fill=label_color)
 
         return canvas, (min_x, max_x, min_y, max_y)
 
@@ -200,10 +208,24 @@ class GameState:
         self.p1_str = p1_str
         self.p2_str = p2_str
         self.agents = {}
+        self.hf_token = hf_token or os.environ.get("HF_TOKEN", "")
+        if not self.hf_token and os.path.exists(".hf_token"):
+            try:
+                with open(".hf_token", "r") as f:
+                    self.hf_token = f.read().strip()
+            except: pass
+            
+        # Save for persistence
+        if self.hf_token:
+            try:
+                with open(".hf_token", "w") as f:
+                    f.write(self.hf_token)
+            except: pass
+
         for p_name, a_str in [("Player1", p1_str), ("Player2", p2_str)]:
             if a_str == "Star2.5": self.agents[p_name] = StarAgent(p_name)
             elif a_str == "MCTS": self.agents[p_name] = MCTSAgent(p_name)
-            elif a_str == "Hybrid LLM": self.agents[p_name] = HybridLLMAgent(p_name, hf_token)
+            elif a_str == "Hybrid LLM": self.agents[p_name] = HybridLLMAgent(p_name, self.hf_token)
             elif a_str == "Greedy": self.agents[p_name] = GreedyAgent(p_name)
             else: self.agents[p_name] = None  # None indicates Human
             
@@ -337,7 +359,7 @@ class GameState:
                 self.logs.append(f"🤝 <b>It's a TIE ({p1_score} vs {p2_score})!</b>")
         return self.get_ui_state()
 
-        log_html = "<div style='height:400px; overflow-y:auto; font-family:monospace; background: var(--background-fill-secondary); color: var(--body-text-color); padding:10px; border-radius:5px; border: 1px solid var(--border-color-primary);'>"
+        log_html = "<div style='height:200px; overflow-y:auto; font-family:monospace; background: var(--background-fill-secondary); color: var(--body-text-color); padding:10px; border-radius:5px; border: 1px solid var(--border-color-primary);'>"
         log_html += "<br>".join(reversed(self.logs))
         log_html += "</div>"
         
@@ -378,7 +400,7 @@ class GameState:
             ghost_moves = [(x, y, r) for x, y, r in self.pending_legal_moves if r == self.human_selected_rotation]
             human_coord_choices = [f"{x},{y}" for x, y, r in ghost_moves]
             
-        log_html = "<div style='height:400px; overflow-y:auto; font-family:monospace; background: var(--background-fill-secondary); color: var(--body-text-color); padding:10px; border-radius:5px; border: 1px solid var(--border-color-primary);'>"
+        log_html = "<div style='height:200px; overflow-y:auto; font-family:monospace; background: var(--background-fill-secondary); color: var(--body-text-color); padding:10px; border-radius:5px; border: 1px solid var(--border-color-primary);'>"
         log_html += "<br>".join(reversed(self.logs))
         log_html += "</div>"
         
@@ -434,7 +456,6 @@ def _unpack_ui_state(gs):
     
     # Initialize all UI variables with defaults to prevent UnboundLocalError
     controls_visible = False
-    coord_val = "None"
     meeple_choices = ["None"]
     meeple_val = "None"
     tile_html_val = "<i>Waiting for turn...</i>"
@@ -449,20 +470,17 @@ def _unpack_ui_state(gs):
         rot = gs.human_selected_rotation
         tile_html_val = f'''
         <div style="text-align:center;">
-            <p><b>Draw: {t.name}</b></p>
-            <div style="display: inline-block; transform: rotate({rot}deg); transition: transform 0.3s;">
+            <p style="margin: 0; font-weight: bold;">Draw: {t.name}</p>
+            <div style="display: inline-block; transform: rotate({rot}deg); transition: transform 0.3s; margin: 10px 0;">
                 <img src="{b64}" width="120" style="margin: 0 auto; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));"/>
             </div>
-            <p style="font-size: 0.8em; color: #666; margin-top: 10px;">📍 Click the silver ghost spots on the board!</p>
-            <p>Rotation: {rot}°</p>
+            <p style="font-size: 0.8em; color: #666; margin: 0;">📍 Click silver spots on the board!</p>
+            <p style="margin: 0;">Rotation: {rot}°</p>
         </div>
         '''
         
-        if not gs.human_selected_coords:
-            coord_val = "📍 Click the board below"
-            hint_val = "💡 <b>Tip:</b> If moves list is empty, try <b>🔄 Rotating</b> the tile!"
-        else:
-            coord_val = f"✅ Selected: **({gs.human_selected_coords})**"
+        hint_val = "💡 <b>Tip:</b> If moves list is empty, try <b>🔄 Rotating</b> the tile!"
+        if gs.human_selected_coords:
             hint_val = "📝 <b>Next:</b> Choose if you want to place a 👤 <b>Meeple</b>, then click <b>Confirm Move</b>."
         
         meeple_choices = ["None"] + [f"{s.type.name} - {i}" for i, s in enumerate(t.segments)]
@@ -590,7 +608,7 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
                 player1_dd = gr.Dropdown(choices=AGENT_CHOICES, value="Greedy", label="🔴 Player 1 AI Mechanism")
                 player2_dd = gr.Dropdown(choices=AGENT_CHOICES, value="Star2.5", label="🔵 Player 2 AI Mechanism")
                 
-            token_input = gr.Textbox(label="Hugging Face Token (Required for Hybrid LLM only)", type="password", placeholder="hf_...", value=os.environ.get("HF_TOKEN", ""))
+            token_input = gr.Textbox(label="Hugging Face Token (Required for Hybrid LLM only)", type="password", placeholder="hf_...", value=HF_TOKEN_DEFAULT)
             stats_view = gr.Markdown(value="Hit Start to begin.")
             
             with gr.Row():
