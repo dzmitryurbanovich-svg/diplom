@@ -58,7 +58,7 @@ class PIL_Renderer:
     TILE_SIZE = 120 # Slightly larger for better detail
     
     @classmethod
-    def render_board(cls, board, last_played=None, ghost_moves=None, selected_coords=None, meeple_hints=None):
+    def render_board(cls, board, last_played=None, ghost_moves=None, selected_coords=None, meeple_hints=None, is_ai_move=False):
         all_points = list(board.grid.keys())
         if ghost_moves:
             all_points.extend([(m[0], m[1]) for m in ghost_moves])
@@ -100,7 +100,8 @@ class PIL_Renderer:
                 draw.rectangle([tx, ty, tx+cls.TILE_SIZE-1, ty+cls.TILE_SIZE-1], fill="grey", outline="white")
             
             if (gx, gy) == last_played:
-                draw.rectangle([tx+1, ty+1, tx+cls.TILE_SIZE-2, ty+cls.TILE_SIZE-2], outline="#ffd166", width=4)
+                highlight_color = "#a0fe8c" if is_ai_move else "#ffd166"
+                draw.rectangle([tx+1, ty+1, tx+cls.TILE_SIZE-2, ty+cls.TILE_SIZE-2], outline=highlight_color, width=4)
 
             # Draw Meeples
             for i, seg in enumerate(tile.segments):
@@ -336,7 +337,7 @@ class GameState:
         **Current Turn:** {self.current_player}
         """
         
-        return img_obj, log_html, stats, human_coord_choices
+        return img_obj, log_html, stats
 
     def rotate_human_tile(self):
         if not self.pending_human_turn: return
@@ -365,7 +366,15 @@ class GameState:
         log_html += "<br>".join(reversed(self.logs))
         log_html += "</div>"
         
-        img_obj, bounds = PIL_Renderer.render_board(self.board, getattr(self, "last_played", None), ghost_moves=ghost_moves, selected_coords=self.human_selected_coords)
+        # Determine if last move was by AI
+        is_ai_move = False
+        if hasattr(self, "last_played_player"):
+            is_ai_move = self.agents.get(self.last_played_player) is not None
+
+        img_obj, bounds = PIL_Renderer.render_board(self.board, getattr(self, "last_played", None), 
+                                               ghost_moves=ghost_moves, 
+                                               selected_coords=self.human_selected_coords,
+                                               is_ai_move=is_ai_move)
         self.board_bounds = bounds
         
         # Calculate Meeple Hints for the selected coord
@@ -388,7 +397,8 @@ class GameState:
             img_obj, _ = PIL_Renderer.render_board(self.board, getattr(self, "last_played", None), 
                                                  ghost_moves=ghost_moves, 
                                                  selected_coords=self.human_selected_coords,
-                                                 meeple_hints=meeple_hints)
+                                                 meeple_hints=meeple_hints,
+                                                 is_ai_move=is_ai_move)
         
         stats = f"""
         ### 📊 Current Score
@@ -399,12 +409,12 @@ class GameState:
         **Current Turn:** {self.current_player}
         """
         
-        return img_obj, log_html, stats, human_coord_choices
+        return img_obj, log_html, stats
 
 _global_state = GameState("Human", "Star2.5")
 
 def _unpack_ui_state(gs):
-    img, log, stats, coord_choices = gs.get_ui_state()
+    img, log, stats = gs.get_ui_state()
     
     # Initialize all UI variables with defaults to prevent UnboundLocalError
     controls_visible = False
@@ -413,7 +423,6 @@ def _unpack_ui_state(gs):
     meeple_val = "None"
     tile_html_val = "<i>Waiting for turn...</i>"
     hint_val = "Ready. Click 'Next Turn' to proceed."
-    coord_dd_val = None
     
     if gs.pending_human_turn:
         controls_visible = True
@@ -434,12 +443,11 @@ def _unpack_ui_state(gs):
         '''
         
         if not gs.human_selected_coords:
-            coord_val = "📍 Click the board or select below"
+            coord_val = "📍 Click the board below"
             hint_val = "💡 <b>Tip:</b> If moves list is empty, try <b>🔄 Rotating</b> the tile!"
         else:
             coord_val = f"✅ Selected: **({gs.human_selected_coords})**"
             hint_val = "📝 <b>Next:</b> Choose if you want to place a 👤 <b>Meeple</b>, then click <b>Confirm Move</b>."
-            coord_dd_val = gs.human_selected_coords
         
         meeple_choices = ["None"] + [f"{s.type.name} - {i}" for i, s in enumerate(t.segments)]
         meeple_val = "None"
@@ -450,8 +458,7 @@ def _unpack_ui_state(gs):
         gr.update(value=coord_val),
         gr.update(choices=meeple_choices, value=meeple_val),
         gr.update(value=tile_html_val),
-        gr.update(value=hint_val),
-        gr.update(choices=coord_choices, value=coord_dd_val)
+        gr.update(value=hint_val)
     )
 
 def step_game():
@@ -562,6 +569,7 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
     with gr.Row():
         with gr.Column(scale=2):
             board_view = gr.Image(interactive=False, type="pil", label="Carcassonne Board", height=600)
+            logs_view = gr.HTML(value="Logs will appear here.")
         with gr.Column(scale=1):
             with gr.Row():
                 player1_dd = gr.Dropdown(choices=AGENT_CHOICES, value="Greedy", label="🔴 Player 1 AI Mechanism")
@@ -588,23 +596,19 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
                         with gr.Group():
                             btn_rotate = gr.Button("🔄 Rotate Tile", variant="secondary")
                             human_coord_display = gr.Markdown("📍 **Select a location**")
-                            human_coord_dd = gr.Dropdown(label="Location Fallback", choices=[])
                             human_meeple_dd = gr.Dropdown(label="👤 Meeple Target")
                             human_submit = gr.Button("✅ Confirm Move", variant="primary", elem_classes=["lg-btn"])
                 gr.Markdown("---")
             # ------------------------------------------
             
-            logs_view = gr.HTML(value="Logs will appear here.")
-            
-    # Function wiring: unpack all 9 outputs
-    UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_coord_display, human_meeple_dd, human_tile_display, human_hint_md, human_coord_dd]
+    # Function wiring: unpack all 8 outputs
+    UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_coord_display, human_meeple_dd, human_tile_display, human_hint_md]
     
     btn_start.click(fn=game_loop, inputs=[], outputs=UI_OUTPUTS)
     btn_rotate.click(fn=rotate_tile, inputs=[], outputs=UI_OUTPUTS)
     
     # Coordinates click handler
     board_view.select(fn=handle_board_click, inputs=[], outputs=UI_OUTPUTS)
-    human_coord_dd.change(fn=set_coords, inputs=[human_coord_dd], outputs=UI_OUTPUTS)
     
     human_submit.click(fn=submit_human, inputs=[human_meeple_dd], outputs=UI_OUTPUTS)
     
