@@ -368,7 +368,7 @@ class GameState:
         
         # Determine if last move was by AI
         is_ai_move = False
-        if hasattr(self, "last_played_player"):
+        if getattr(self, "last_played_player", None):
             is_ai_move = self.agents.get(self.last_played_player) is not None
 
         img_obj, bounds = PIL_Renderer.render_board(self.board, getattr(self, "last_played", None), 
@@ -568,7 +568,7 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
     
     with gr.Row():
         with gr.Column(scale=2):
-            board_view = gr.Image(interactive=False, type="pil", label="Carcassonne Board", height=600)
+            board_view = gr.Image(interactive=False, type="pil", label="Carcassonne Board", height=500)
             logs_view = gr.HTML(value="Logs will appear here.")
         with gr.Column(scale=1):
             with gr.Row():
@@ -624,8 +624,9 @@ if __name__ == "__main__":
         server_name="0.0.0.0", 
         server_port=7860,
         css="""
-        .hint-box { background: var(--amber-50); padding: 10px; border-radius: 8px; border-left: 4px solid var(--amber-500); margin-top: 10px; font-size: 0.9em; }
-        #human_controls { border: 2px solid var(--primary-500); padding: 15px; border-radius: 12px; background: var(--background-fill-primary); }
-        .lg-btn { height: 60px !important; font-size: 1.2em !important; }
+        .hint-box { background: var(--amber-50); padding: 5px 10px; border-radius: 8px; border-left: 4px solid var(--amber-500); margin-top: 5px; font-size: 0.85em; }
+        #human_controls { border: 1px solid var(--primary-500); padding: 10px; border-radius: 12px; background: var(--background-fill-primary); }
+        .lg-btn { height: 45px !important; font-size: 1.1em !important; }
+        footer { display: none !important; }
         """
     )
