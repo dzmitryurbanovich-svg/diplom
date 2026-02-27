@@ -1,0 +1,126 @@
+\documentclass[10pt]{beamer}
+\usepackage[english,russian]{babel}
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\setsansfont{Arial}
+\setmonofont{Courier New}
+
+\usetheme{Madrid}
+\usecolortheme{whale}
+
+\usepackage{graphicx}
+\graphicspath{ {./images} }
+
+\title[Математическая модель Каркассон]{Математическая модель и задача оптимизации игры Каркассон}
+\subtitle{Глава 1: Описание игры и целевая задача}
+\author[Урбанович Д. И.]{Дмитрий Игоревич Урбанович}
+\institute[БГУ]{Белорусский государственный университет \\ Механико-математический факультет}
+\date[Минск 2025]{Минск, 2025}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Введение: Настольные игры как бенчмарк ИИ}
+    \begin{itemize}
+        \item \textbf{Эволюция ИИ:} От детерминированных игр (Шахматы, Го) к стохастическим средам.
+        \item \textbf{Carcassonne (2000):} «Золотой стандарт» современных Eurogames.
+        \item \textbf{Особенности для ИИ:}
+            \begin{itemize}
+                \item Динамическое игровое поле.
+                \item Оптимизация ресурсов (миплы).
+                \item Стохастический выбор (закрытая колода).
+            \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Структура игрового процесса}
+    \begin{columns}
+        \begin{column}{0.6\textwidth}
+            Каждый ход состоит из 3 фаз:
+            \begin{enumerate}
+                \item \textbf{Размещение тайла:} Соблюдение топологической связности.
+                \item \textbf{Размещение мипла:} Захват объектов (дороги, города, монастыри, поля).
+                \item \textbf{Подсчет и возврат:} Получение очков и освобождение ресурсов.
+            \end{enumerate}
+        \end{column}
+        \begin{column}{0.4\textwidth}
+            \includegraphics[width=\textwidth]{carcassonne_rules.jpeg}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Экономика ресурсов и стратегическая глубина}
+    \begin{itemize}
+        \item \textbf{Лимит миплов:} Всего 7 подданных на всю игру.
+        \item \textbf{Проблема «замораживания»:} Риск потери мобильности на долгостроях.
+        \item \textbf{Конкуренция:} Механики слияния и разделения объектов.
+        \item \textbf{Мета-игра:} Блокировка соперника («мертвые города») и психологическое давление.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Система подсчета очков (Таксономия)}
+    \begin{table}
+        \begin{tabular}{|l|l|l|}
+        \hline
+        \textbf{Объект} & \textbf{Очки} & \textbf{Сложность ИИ} \\ \hline
+        Дороги & 1/тайл & Низкая (Тактика) \\ \hline
+        Города & 2/тайл + бонусы & Средняя (Геометрия) \\ \hline
+        Монастыри & 9 (фикс) & Средняя (Окружение) \\ \hline
+        Поля & 3 за кажд. город & Высокая (Стратегия) \\ \hline
+        \end{tabular}
+    \end{table}
+\end{frame}
+
+\begin{frame}{Комбинаторная сложность}
+    \begin{itemize}
+        \item \textbf{Пространство состояний:} $\sim 10^{40}$ (нижняя граница).
+        \item \textbf{Дерево игры:} $\sim 10^{194}$.
+        \item \textbf{Branching Factor:} До 500+ вариантов на один ход в середине партии.
+        \item \textbf{Сравнение с шахматами:} Сложнее из-за динамического поля и стохастичности.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Проблематика алгоритмического решения}
+    \begin{itemize}
+        \item \textbf{Action Gap:} Разрыв между стратегическим планом ИИ и тактическим выбором координат.
+        \item \textbf{Неопределенность:} Неизвестности будущего тайла требует вероятностного анализа.
+        \item \textbf{Ограничения MCTS:} Стохастический шум мешает оценке долгосрочных полевых стратегий.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Сравнительный анализ подходов}
+    \begin{enumerate}
+        \item \textbf{Эвристики (Star2.5):} Быстро, но предсказуемо и без стратегии.
+        \item \textbf{MCTS:} Мощный поиск, но «шумный» в Каркассоне.
+        \item \textbf{Hybrid AI (LLM + Logic):}
+            \begin{itemize}
+                \item \textbf{Генерал (LLM):} Стратегическое планирование.
+                \item \textbf{Солдат (Logic):} Тактическое исполнение.
+            \end{itemize}
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}{Цели и задачи исследования}
+    \textbf{Цель:} Разработка гибридной архитектуры ИИ (LLM + MCTS) для оптимизации стратегии.
+    \vspace{0.3cm}
+    \textbf{Задачи:}
+    \begin{enumerate}
+        \item Реализация MCP-сервера для игрового движка.
+        \item Разработка агента «Генерал-Солдат».
+        \item Исследование методик \textbf{Tree of Thoughts} и \textbf{Reflexion}.
+        \item Сравнительный анализ эффективности в турнирах.
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}
+    \begin{center}
+        {\Huge Спасибо за внимание!} \\
+        \vspace{1cm}
+        Вопросы?
+    \end{center}
+\end{frame}
+
+\end{document}
