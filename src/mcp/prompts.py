@@ -1,34 +1,39 @@
-SYSTEM_PROMPT = """You are a Grandmaster Carcassonne Player. Your goal is to maximize your long-term score while strategically blocking opponents.
-You have access to a game engine via tools. Use 'get_board_state' to see the grid and 'get_legal_moves' to see options for your current tile.
+SYSTEM_PROMPT = """You are a Grandmaster Carcassonne Strategist. 
+Your goal is to maximize your own score while strategically blocking your opponent and controlling key territory.
+You balance short-term point gains with long-term placement potential.
+You are the 'General' in a General-Soldier architecture: you provide the strategic vision, while the code executes the tactical layout."""
+
+TOT_PROMPT_TEMPLATE = """### General-Soldier SITREP
+Current Tile: {tile_name}
+Legal Moves (truncated): {legal_moves}
+Meeples Remaining: {meeples_left}/7
+Tiles Remaining in Deck: {tiles_remaining}/72
+
+### Strategy Generation (Tree of Thoughts)
+Please follow this reasoning chain:
+1. **Exploration**: Identify 3 distinct strategic paths (e.g., Aggressive Expansion, Blocking, Greedy Scoring).
+2. **Simulation**: For each path, evaluate the potential state after 2 turns.
+3. **Evaluation**: Assign a confidence score (0-10) to each path based on current resources.
+4. **Final Order**: Choose the best path.
+
+### Response Format
+Order: [CITY / ROAD / MONASTERY / GREEDY / BLOCKING]
+Rationale: [One sentence explaining why this path was chosen]
 """
 
-TOT_PROMPT_TEMPLATE = """Current Tile: {tile_name}
-Available Moves: {legal_moves}
+# Tool for reflecting on previous bad results
+REFLEXION_PROMPT_TEMPLATE = """### Reflexion Cycle
+Previous Order: {last_order}
+Actual Result: {result_description}
+Error Detected: {error}
 
-As a strategic player, please generate 3 distinct 'Thoughts' (potential plans) for this turn.
-For each thought, specify:
-1. Coordinate (x, y) and Rotation.
-2. Immediate point gain.
-3. Long-term strategic value (e.g., city expansion, blocking).
-4. Potential risks.
+Analyze why the previous strategy failed. Was it a meeple deficit? A forgotten blocking opportunity?
+Update your strategic rules to prevent this in the next cycle."""
 
-After articulating these 3 thoughts, evaluate them and choose the best one.
-"""
+SITUATIONAL_AWARENESS_TEMPLATE = """### Battlefield Analysis
+- Score Gap: {score_gap}
+- Opportunity Cost: {opp_cost}
+- Mid-Game Phase Indicators: {phase_info}
 
-REFLEXION_PROMPT_TEMPLATE = """Last Turn Analysis:
-Move made: {last_move}
-Actual Outcome: {outcome}
-Error/Inefficiency detected: {error_description}
-
-Please reflect on this mistake. Why was this move suboptimal? 
-Write a one-sentence rule for yourself to avoid this in the future.
-This rule will be added to your operational memory.
-"""
-
-STRATEGIC_CONTEXT_TEMPLATE = """Game Summary at turn {turn}:
-- Occupied regions: {occupied_count}
-- Completed objects: {completed_count}
-- Opponent potential: {opponent_score_potential}
-
-Strategic focus recommendation: {recommendation}
+Recommendation: {recommendation}
 """

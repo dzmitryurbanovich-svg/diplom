@@ -99,9 +99,22 @@ async def handle_list_tools() -> list[types.Tool]:
         types.Tool(
             name="get_completed_features",
             description="Extracts completed features, scores them, and frees meeples. Should be called after each turn.",
+            inputSchema={"type": "object", "properties": {}}
+        ),
+        types.Tool(
+            name="get_strategic_sitrep",
+            description="Provides a high-level situational report: scores, meeple counts, and deck status.",
+            inputSchema={"type": "object", "properties": {}}
+        ),
+        types.Tool(
+            name="get_tactical_advice",
+            description="Asks the 'Soldier' (engine) for a tactical evaluation of the top legal moves for a specific tile.",
             inputSchema={
                 "type": "object",
-                "properties": {}
+                "properties": {
+                    "tile_name": {"type": "string"}
+                },
+                "required": ["tile_name"]
             }
         ),
     ]
@@ -242,6 +255,45 @@ async def handle_call_tool(
         # Returns the final endgame logic for fields and incomplete cities/roads/cloisters
         final_scores = board.calculate_final_scores()
         return [types.TextContent(type="text", text=json.dumps(final_scores))]
+
+    elif name == "get_strategic_sitrep":
+        # Returns a report for the 'General'
+        meeple_p1 = board.meeple_counts.get("Player1", 7)
+        meeple_p2 = board.meeple_counts.get("Player2", 7)
+        score_p1 = board.scores.get("Player1", 0)
+        score_p2 = board.scores.get("Player2", 0)
+        
+        report = {
+            "scores": {"Player1": score_p1, "Player2": score_p2},
+            "meeples": {"Player1": meeple_p1, "Player2": meeple_p2},
+            "score_gap": score_p1 - score_p2,
+            "phase": "Opening" if len(board.grid) < 20 else "Mid-game" if len(board.grid) < 50 else "End-game"
+        }
+        return [types.TextContent(type="text", text=json.dumps(report, indent=2))]
+
+    elif name == "get_tactical_advice":
+        tile_name = arguments.get("tile_name")
+        # Reuse legal move logic
+        legal_moves = []
+        to_check = set()
+        for (x, y) in board.grid:
+            for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+                if (x + dx, y + dy) not in board.grid:
+                    to_check.add((x + dx, y + dy))
+        
+        evaluations = []
+        for tx, ty in to_check:
+            for rot in [0, 90, 180, 270]:
+                test_tile = DECK_DEFINITIONS[tile_name]()
+                test_tile.rotate(rot // 90)
+                if board.is_legal_move(tx, ty, test_tile):
+                    # Basic score heuristic
+                    score = sum(1 for dx, dy in [(0,1), (1,0), (0,-1), (-1,0)] if (tx+dx, ty+dy) in board.grid)
+                    evaluations.append({"x": tx, "y": ty, "rot": rot, "tactical_value": score})
+        
+        # Sort and return top 5
+        evaluations.sort(key=lambda x: x["tactical_value"], reverse=True)
+        return [types.TextContent(type="text", text=json.dumps(evaluations[:5], indent=2))]
 
     elif name == "reset_board":
         board = Board()

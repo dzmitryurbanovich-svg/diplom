@@ -118,28 +118,39 @@ class HybridLLMAgent(CarcassonneAgent):
     def _get_llm_strategy(self, tile_name: str, legal_moves: List, current_meeples: int, remaining_tiles: int) -> str:
         if not self.token.strip(): return "GREEDY"
         
-        # Use the official research prompts from src/mcp/prompts.py
+        # SITREP: Situational Report for the General
         user_content = TOT_PROMPT_TEMPLATE.format(
             tile_name=tile_name,
-            legal_moves=str(legal_moves[:10]) # Limiting to 10 for prompt efficiency
+            legal_moves=str(legal_moves[:5]), # Just the first 5 for clarity
+            meeples_left=current_meeples,
+            tiles_remaining=remaining_tiles
         )
-        # Combine with some strategic context
-        prompt = f"<s>[INST] <<SYS>>\n{SYSTEM_PROMPT}\n<</SYS>>\n\n{user_content}\n" \
-                 f"Analyze the board and choose a macro-strategy: CITY, ROAD, or GREEDY. " \
-                 f"Resources: {current_meeples} meeples, {remaining_tiles} tiles left. " \
-                 f"Reply with exactly ONE word (CITY, ROAD, or GREEDY): [/INST]"
+        
+        # General's Orders Formulation
+        prompt = f"<s>[INST] <<SYS>>\n{SYSTEM_PROMPT}\n<</SYS>>\n\n{user_content}[/INST]"
         
         headers = {"Authorization": f"Bearer {self.token.strip()}"}
-        payload = {"inputs": prompt, "parameters": {"return_full_text": False, "max_new_tokens": 5, "stop": ["\n", " "]} }
+        payload = {"inputs": prompt, "parameters": {"return_full_text": False, "max_new_tokens": 50, "stop": ["\n\n"]} }
         
         try:
             response = httpx.post(HF_API_URL, headers=headers, json=payload, timeout=30.0)
             result = response.json()
             if isinstance(result, list): text = result[0].get('generated_text', '').strip().upper()
             else: text = result.get('generated_text', '').strip().upper()
-            for k in ["CITY", "ROAD", "GREEDY"]:
-                if k in text: return k
-            return "GREEDY"
+            
+            # Extract order and rationale
+            order = "GREEDY"
+            for k in ["CITY", "ROAD", "MONASTERY", "GREEDY", "BLOCKING"]:
+                if k in text:
+                    order = k
+                    break
+            
+            # Log the General's Rationale if present
+            if "RATIONALE:" in text:
+                rationale = text.split("RATIONALE:")[-1].strip()
+                print(f"[GENERAL {self.name}] Order: {order} | Rationale: {rationale}")
+                
+            return order
         except Exception as e:
             print(f"LLM Error: {e}")
             return "GREEDY"
@@ -168,23 +179,37 @@ class HybridLLMAgent(CarcassonneAgent):
             # Tactical Meeple Placement based on Strategy
             if current_meeples > 0:
                 for i, seg in enumerate(tile.segments):
-                    if strategy == "CITY" and seg.type.name == "CITY":
+                    seg_type = seg.type.name
+                    if strategy == "CITY" and seg_type == "CITY":
                         score += 15 # High priority for city expansion
                         meeple_idx = i
                         break
-                    elif strategy == "ROAD" and seg.type.name == "ROAD":
+                    elif strategy == "ROAD" and seg_type == "ROAD":
                         score += 8 # Priority for road expansion
                         meeple_idx = i
                         break
+                    elif strategy == "MONASTERY" and seg_type == "MONASTERY":
+                        score += 20 # Highest priority for monasteries
+                        meeple_idx = i
+                        break
+                    elif strategy == "BLOCKING":
+                        # In blocking mode, we look for 'locked' positions 
+                        # We value neighbors but avoid placing meeples on contested features
+                        score += neighbors * 4 
+                        meeple_idx = None # Soldier decides NOT to place a meeple to save resources
+                        break
                     elif strategy == "GREEDY":
-                        if seg.type.name in ["CITY", "MONASTERY"]:
+                        if seg_type in ["CITY", "MONASTERY"]:
                             score += 5
                             meeple_idx = i
                             break
-                        elif seg.type.name == "ROAD":
+                        elif seg_type == "ROAD":
                             score += 2
                             meeple_idx = i
             
+            # Add a small random noise to tactical scoring to avoid deterministic stagnation
+            score += random.uniform(0, 0.5)
+
             if score > best_tactical_score:
                 best_tactical_score = score
                 best_move = (tx, ty, rot)
