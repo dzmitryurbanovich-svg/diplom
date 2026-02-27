@@ -3,6 +3,7 @@ import urllib.parse
 
 from src.logic.engine import Board
 from src.logic.deck import DECK_DEFINITIONS
+from src.logic.telemetry import game_telemetry
 
 import base64
 import os
@@ -388,6 +389,10 @@ class GameState:
                 self.logs.append(f"🏆 <b>Winner is Player 2 ({p2_score} vs {p1_score})!</b>")
             else:
                 self.logs.append(f"🤝 <b>It's a TIE ({p1_score} vs {p2_score})!</b>")
+                
+            # TELEMETRY: Finalize game and save outcome for learning
+            winner = "Player1" if p1_score > p2_score else "Player2" if p2_score > p1_score else "Tie"
+            game_telemetry.finalize_game(self.scores, winner)
         return self.get_ui_state()
 
     def rotate_human_tile(self):

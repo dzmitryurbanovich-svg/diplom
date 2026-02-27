@@ -4,6 +4,7 @@ from typing import Tuple, List, Optional
 from src.logic.models import Tile
 from src.logic.engine import Board
 from src.mcp.prompts import SYSTEM_PROMPT, TOT_PROMPT_TEMPLATE
+from src.logic.telemetry import game_telemetry
 
 class CarcassonneAgent:
     def __init__(self, name: str):
@@ -118,6 +119,9 @@ class HybridLLMAgent(CarcassonneAgent):
     def _get_llm_strategy(self, tile_name: str, legal_moves: List, current_meeples: int, remaining_tiles: int) -> str:
         if not self.token.strip(): return "GREEDY"
         
+        # PERSISTENT LEARNING: Load lessons from past games
+        past_lessons = game_telemetry.get_past_lessons(self.name)
+        
         # SITREP: Situational Report for the General
         user_content = TOT_PROMPT_TEMPLATE.format(
             tile_name=tile_name,
@@ -126,8 +130,8 @@ class HybridLLMAgent(CarcassonneAgent):
             tiles_remaining=remaining_tiles
         )
         
-        # General's Orders Formulation
-        prompt = f"<s>[INST] <<SYS>>\n{SYSTEM_PROMPT}\n<</SYS>>\n\n{user_content}[/INST]"
+        # General's Orders Formulation with Memory
+        prompt = f"<s>[INST] <<SYS>>\n{SYSTEM_PROMPT}\n\nPast Lessons Learned:\n{past_lessons}\n<</SYS>>\n\n{user_content}[/INST]"
         
         headers = {"Authorization": f"Bearer {self.token.strip()}"}
         payload = {"inputs": prompt, "parameters": {"return_full_text": False, "max_new_tokens": 50, "stop": ["\n\n"]} }
@@ -214,5 +218,16 @@ class HybridLLMAgent(CarcassonneAgent):
                 best_tactical_score = score
                 best_move = (tx, ty, rot)
                 best_meeple = meeple_idx
+        
+        # TELEMETRY: Log the decision process for future learning
+        game_telemetry.log_turn({
+            "agent": self.name,
+            "tile": tile.name,
+            "strategy": strategy,
+            "move": {"x": best_move[0], "y": best_move[1], "rot": best_move[2]},
+            "meeple_placed": best_meeple,
+            "meeples_left": current_meeples,
+            "remaining_tiles": remaining_tiles
+        })
                 
         return best_move[0], best_move[1], best_move[2], best_meeple
