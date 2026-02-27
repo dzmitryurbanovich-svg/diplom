@@ -20,6 +20,31 @@ if not HF_TOKEN_DEFAULT and os.path.exists(".hf_token"):
             HF_TOKEN_DEFAULT = f.read().strip()
     except: pass
 
+class UserAuthManager:
+    DB_PATH = "users_db.json"
+    @classmethod
+    def _load(cls):
+        if not os.path.exists(cls.DB_PATH): return {}
+        try:
+            with open(cls.DB_PATH, "r") as f: return json.load(f)
+        except: return {}
+    @classmethod
+    def _save(cls, db):
+        with open(cls.DB_PATH, "w") as f: json.dump(db, f)
+    @classmethod
+    def register(cls, username, password):
+        if not username or not password: return "❌ Username/password empty."
+        db = cls._load()
+        if username in db: return "❌ User already exists."
+        db[username] = hashlib.sha256(password.encode()).hexdigest()
+        cls._save(db)
+        return "✅ Registered! Please click Login."
+    @classmethod
+    def login(cls, username, password):
+        db = cls._load()
+        if username not in db: return False
+        return db[username] == hashlib.sha256(password.encode()).hexdigest()
+
 def load_assets():
     tiles_dir = "assets/tiles"
     base_names = "ABCDEFGHIJKLMNOPQRSTUVWX"
@@ -166,16 +191,19 @@ class PIL_Renderer:
         
         # Vertical lines and X labels (at the bottom)
         for x in range(min_x - 1, max_x + 2):
-            tx, _ = get_t_pos(x, max_y + 1)
+            tx, ty = get_t_pos(x, max_y + 1)
             draw.line([tx, 0, tx, height_tiles * cls.TILE_SIZE], fill=grid_color, width=1)
-            # Center label in tile slot
-            draw.text((tx + cls.TILE_SIZE // 2 - 5, height_tiles * cls.TILE_SIZE - 20), str(x), fill=label_color)
+            # Center label in slot
+            lx, ly = tx + cls.TILE_SIZE // 2 - 5, height_tiles * cls.TILE_SIZE - 20
+            draw.text((lx, ly), str(x), fill=label_color)
             
         # Horizontal lines and Y labels (on the left)
         for y in range(min_y - 1, max_y + 2):
             _, ty = get_t_pos(min_x - 1, y)
             draw.line([0, ty, width_tiles * cls.TILE_SIZE, ty], fill=grid_color, width=1)
-            draw.text((5, ty + cls.TILE_SIZE // 2 - 5), str(y), fill=label_color)
+            # Center label in slot
+            lx, ly = 5, ty + cls.TILE_SIZE // 2 - 5
+            draw.text((lx, ly), str(y), fill=label_color)
 
         return canvas, (min_x, max_x, min_y, max_y)
 
@@ -558,18 +586,20 @@ def submit_human(meeple):
         yield update
 
 
-def reset_game(p1, p2, token):
+def reset_game(p1, p2):
     global _global_state
-    _global_state = GameState(p1, p2, token)
+    _global_state = GameState(p1, p2)
     return _unpack_ui_state(_global_state)
 
-def change_agents(p1, p2, token):
+def change_agents(p1, p2):
     _global_state.p1_str = p1
     _global_state.p2_str = p2
+    # Re-initialize agents based on new choices
+    _global_state.agents = {}
     for p_name, a_str in [("Player1", p1), ("Player2", p2)]:
         if a_str == "Star2.5": _global_state.agents[p_name] = StarAgent(p_name)
         elif a_str == "MCTS": _global_state.agents[p_name] = MCTSAgent(p_name)
-        elif a_str == "Hybrid LLM": _global_state.agents[p_name] = HybridLLMAgent(p_name, token)
+        elif a_str == "Hybrid LLM": _global_state.agents[p_name] = HybridLLMAgent(p_name, _global_state.hf_token)
         elif a_str == "Greedy": _global_state.agents[p_name] = GreedyAgent(p_name)
         else: _global_state.agents[p_name] = None
     return _unpack_ui_state(_global_state)
@@ -579,85 +609,108 @@ AGENT_CHOICES = ["Human", "Greedy", "Star2.5", "MCTS", "Hybrid LLM"]
 
 
 with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
-    gr.Markdown("# 🏰 Carcassonne AI Tournament Engine")
-    gr.Markdown("Watch entirely autonomous agents compete in the classic board game, applying heuristic tree search and LLM-driven strategy.")
-    
-    with gr.Row():
-        with gr.Column(scale=2):
-            board_view = gr.Image(interactive=False, type="pil", label="Carcassonne Board", height=500)
-            logs_view = gr.HTML(value="Logs will appear here.")
-        with gr.Column(scale=1):
-            with gr.Row():
-                player1_dd = gr.Dropdown(choices=AGENT_CHOICES, value="Greedy", label="🔴 Player 1 AI Mechanism")
-                player2_dd = gr.Dropdown(choices=AGENT_CHOICES, value="Star2.5", label="🔵 Player 2 AI Mechanism")
-                
-            token_input = gr.Textbox(label="Hugging Face Token (Required for Hybrid LLM only)", type="password", placeholder="hf_...", value=HF_TOKEN_DEFAULT)
-            stats_view = gr.Markdown(value="Hit Start to begin.")
-            
-            with gr.Row():
-                btn_start = gr.Button("▶️ Start / Resume Game", variant="primary")
-                btn_reset = gr.Button("🔄 Reset Board")
-                
-            # --- HUMAN CONTROLS (Modernized Layout) ---
-            with gr.Group(visible=False, elem_id="human_controls") as human_panel:
-                gr.Markdown("### 👤 Your Turn!")
+    # 1. Login Logic
+    def handle_login(name, pwd):
+        if UserAuthManager.login(name, pwd):
+            return gr.update(visible=False), gr.update(visible=True), ""
+        return gr.update(), gr.update(), "❌ Invalid credentials."
+
+    def handle_register(name, pwd):
+        msg = UserAuthManager.register(name, pwd)
+        return msg
+
+    with gr.Column(elem_id="login_container") as login_p:
+        gr.Markdown("# 🔐 Carcassonne Login")
+        u = gr.Textbox(label="Username")
+        p = gr.Textbox(label="Password", type="password")
+        with gr.Row():
+            blog = gr.Button("🔓 Login", variant="primary")
+            breg = gr.Button("📝 Register", variant="secondary")
+        amsg = gr.Markdown("")
+        
+    # 2. Main Game UI
+    with gr.Column(visible=False) as main_p:
+        gr.Markdown("# 🏰 Carcassonne AI Tournament Engine")
+        gr.Markdown("Watch entirely autonomous agents compete in the classic board game, applying heuristic tree search and LLM-driven strategy.")
+        
+        with gr.Row():
+            with gr.Column(scale=2):
+                board_view = gr.Image(interactive=False, type="pil", label="Carcassonne Board", height=500)
+                logs_view = gr.HTML(value="Logs will appear here.")
+            with gr.Column(scale=1):
                 with gr.Row():
-                    # Sidebar for tile preview
-                    with gr.Column(scale=1):
-                        human_tile_display = gr.HTML()
-                        human_hint_md = gr.HTML("💡 <b>Hint:</b> Click a gold spot on the board!", elem_classes=["hint-box"])
+                    player1_dd = gr.Dropdown(choices=AGENT_CHOICES, value="Greedy", label="🔴 Player 1 AI Mechanism")
+                    player2_dd = gr.Dropdown(choices=AGENT_CHOICES, value="Star2.5", label="🔵 Player 2 AI Mechanism")
                     
-                    # Main action area
-                    with gr.Column(scale=2):
-                        with gr.Group():
-                            btn_rotate = gr.Button("🔄 Rotate Tile", variant="secondary")
-                            human_meeple_dd = gr.Dropdown(label="👤 Meeple Target")
-                            human_submit = gr.Button("✅ Confirm Move", variant="primary", elem_classes=["lg-btn"])
-                gr.Markdown("---")
-            # ------------------------------------------
-            
-            with gr.Accordion("📖 Help & Token Guide", open=False):
-                gr.Markdown("""
-                ### 👤 How to Play
-                1. Click on the **silver ghost tiles** on the board to select a location.
-                2. Use the **🔄 Rotate** button to change tile orientation (ghost positions will update).
-                3. Choose a **Meeple Target** if you want to place a follower.
-                4. Click **✅ Confirm Move**.
+                stats_view = gr.Markdown(value="Hit Start to begin.")
                 
-                ### 🔑 Using Hybrid LLM
-                To use the AI with LLM reasoning, you need a **Hugging Face Token**:
-                1. Go to [Hugging Face Tokens](https://huggingface.co/settings/tokens).
-                2. Create a 'Read' token and paste it above.
-                3. **Pro Tip:** Set `HF_TOKEN` as a 'Secret' in your Space Settings to skip this step!
-                """)
-            
-    # Function wiring: unpack all 7 outputs
-    UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_meeple_dd, human_tile_display, human_hint_md]
-    
-    btn_start.click(fn=game_loop, inputs=[], outputs=UI_OUTPUTS)
-    btn_rotate.click(fn=rotate_tile, inputs=[], outputs=UI_OUTPUTS)
-    
-    # Coordinates click handler
-    board_view.select(fn=handle_board_click, inputs=[], outputs=UI_OUTPUTS)
-    
-    human_submit.click(fn=submit_human, inputs=[human_meeple_dd], outputs=UI_OUTPUTS)
-    
-    btn_reset.click(fn=reset_game, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
-    player1_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
-    player2_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
-    
-    # Init
-    demo.load(fn=reset_game, inputs=[player1_dd, player2_dd, token_input], outputs=UI_OUTPUTS)
+                with gr.Row():
+                    btn_start = gr.Button("▶️ Start / Resume Game", variant="primary")
+                    btn_reset = gr.Button("🔄 Reset Board")
+                    
+                # --- HUMAN CONTROLS (Modernized Layout) ---
+                with gr.Group(visible=False, elem_id="human_controls") as human_panel:
+                    gr.Markdown("### 👤 Your Turn!")
+                    with gr.Row():
+                        # Sidebar for tile preview
+                        with gr.Column(scale=1):
+                            human_tile_display = gr.HTML()
+                            human_hint_md = gr.HTML("💡 <b>Hint:</b> Click a gold spot on the board!", elem_classes=["hint-box"])
+                        
+                        # Main action area
+                        with gr.Column(scale=2):
+                            with gr.Group():
+                                btn_rotate = gr.Button("🔄 Rotate Tile", variant="secondary")
+                                human_meeple_dd = gr.Dropdown(label="👤 Meeple Target")
+                                human_submit = gr.Button("✅ Confirm Move", variant="primary", elem_classes=["lg-btn"])
+                    gr.Markdown("---")
+                # ------------------------------------------
+                
+                with gr.Accordion("📖 Help & Token Guide", open=False):
+                    gr.Markdown("""
+                    ### 👤 How to Play
+                    1. Click on the **silver ghost tiles** on the board to select a location.
+                    2. Use the **🔄 Rotate** button to change tile orientation (ghost positions will update).
+                    3. Choose a **Meeple Target** if you want to place a follower.
+                    4. Click **✅ Confirm Move**.
+                    
+                    ### 🔑 Using Hybrid LLM
+                    To use the AI with LLM reasoning, ensuring the **HF_TOKEN** secret is set in your Space Settings.
+                    1. Go to [Hugging Face Settings](https://huggingface.co/settings/tokens).
+                    2. Set the token as a 'Secret' in your Space Settings so the app can access it automatically.
+                    """)
+                
+        # Function wiring: unpack all 7 outputs
+        UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_meeple_dd, human_tile_display, human_hint_md]
+        
+        btn_start.click(fn=game_loop, inputs=[], outputs=UI_OUTPUTS)
+        btn_rotate.click(fn=rotate_tile, inputs=[], outputs=UI_OUTPUTS)
+        
+        # Coordinates click handler
+        board_view.select(fn=handle_board_click, inputs=[], outputs=UI_OUTPUTS)
+        
+        human_submit.click(fn=submit_human, inputs=[human_meeple_dd], outputs=UI_OUTPUTS)
+        
+        btn_reset.click(fn=reset_game, inputs=[player1_dd, player2_dd], outputs=UI_OUTPUTS)
+        player1_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd], outputs=UI_OUTPUTS)
+        player2_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd], outputs=UI_OUTPUTS)
+        
+        # Init
+        demo.load(fn=reset_game, inputs=[player1_dd, player2_dd], outputs=UI_OUTPUTS)
+
+    # Auth Buttons wiring
+    blog.click(fn=handle_login, inputs=[u, p], outputs=[login_p, main_p, amsg])
+    breg.click(fn=handle_register, inputs=[u, p], outputs=[amsg])
 
 if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0", 
         server_port=7860,
-        auth=(os.environ.get("GRADIO_USER", "admin"), os.environ.get("GRADIO_PASSWORD", "carcassonne2024")),
         css="""
         .hint-box { background: var(--amber-50); padding: 5px 10px; border-radius: 8px; border-left: 4px solid var(--amber-500); margin-top: 5px; font-size: 0.85em; }
         #human_controls { border: 1px solid var(--primary-500); padding: 10px; border-radius: 12px; background: var(--background-fill-primary); }
         .lg-btn { height: 45px !important; font-size: 1.1em !important; }
         footer { display: none !important; }
+        #login_container { max-width: 400px; margin: 100px auto; padding: 20px; border: 1px solid var(--border-color-primary); border-radius: 15px; background: var(--background-fill-secondary); }
         """
     )
