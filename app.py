@@ -393,6 +393,21 @@ class GameState:
         return self.get_ui_state()
 
     def _execute_placement(self, tile, tx, ty, rot, meeple_idx):
+        # TELEMETRY: Log every move (Human or AI) for persistent learning
+        agent_obj = self.agents.get(self.current_player)
+        agent_name = agent_obj.name if agent_obj else "Human"
+        
+        game_telemetry.log_turn({
+            "turn_index": 72 - len(self.deck),
+            "player": self.current_player,
+            "agent": agent_name,
+            "tile": tile.name,
+            "move": {"x": tx, "y": ty, "rot": rot},
+            "meeple_placed": meeple_idx,
+            "meeples_held": self.meeples[self.current_player],
+            "scores": self.scores.copy()
+        })
+
         tile.rotate(rot // 90)
         self.board.place_tile(tx, ty, tile)
         self.last_played = (tx, ty)

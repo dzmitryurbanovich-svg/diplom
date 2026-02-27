@@ -219,15 +219,7 @@ class HybridLLMAgent(CarcassonneAgent):
                 best_move = (tx, ty, rot)
                 best_meeple = meeple_idx
         
-        # TELEMETRY: Log the decision process for future learning
-        game_telemetry.log_turn({
-            "agent": self.name,
-            "tile": tile.name,
-            "strategy": strategy,
-            "move": {"x": best_move[0], "y": best_move[1], "rot": best_move[2]},
-            "meeple_placed": best_meeple,
-            "meeples_left": current_meeples,
-            "remaining_tiles": remaining_tiles
-        })
+        # Store for centralized telemetry in app.py
+        self.last_strategy = strategy
                 
         return best_move[0], best_move[1], best_move[2], best_meeple
