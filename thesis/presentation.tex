@@ -1,117 +1,133 @@
-\documentclass[10pt]{beamer}
+\documentclass[10pt, aspectratio=169]{beamer}
 \usepackage[english,russian]{babel}
 \usepackage{fontspec}
 \setmainfont{Times New Roman}
 \setsansfont{Arial}
 \setmonofont{Courier New}
 
-\usetheme{Madrid}
-\usecolortheme{whale}
+% Упрощенное оформление
+\usetheme{default}
+\usecolortheme{dove} 
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
 
 \usepackage{graphicx}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
 \graphicspath{ {./images} }
 
-\title[Математическая модель Каркассон]{Математическая модель и задача оптимизации игры Каркассон}
-\subtitle{Глава 1: Описание игры и целевая задача}
-\author[Урбанович Д. И.]{Дмитрий Игоревич Урбанович}
-\institute[БГУ]{Белорусский государственный университет \\ Механико-математический факультет}
-\date[Минск 2025]{Минск, 2025}
+% Кастомный титульный лист в стиле БГУ
+\setbeamertemplate{title page}{
+    \begin{center}
+        \fontsize{8pt}{10pt}\selectfont
+        МИНИСТЕРСТВО ОБРАЗОВАНИЯ РЕСПУБЛИКИ БЕЛАРУСЬ \\
+        БЕЛОРУССКИЙ ГОСУДАРСТВЕННЫЙ УНИВЕРСИТЕТ \\
+        МЕХАНИКО-МАТЕМАТИЧЕСКИЙ ФАКУЛЬТЕТ \\
+        Кафедра дифференциальных уравнений и системного анализа \\
+        \vspace{1.0cm}
+        \fontsize{12pt}{14pt}\selectfont
+        \textbf{УРБАНОВИЧ Дмитрий Игоревич} \\
+        \vspace{0.8cm}
+        \fontsize{14pt}{16pt}\selectfont
+        \textbf{МАТЕМАТИЧЕСКАЯ МОДЕЛЬ И ЗАДАЧА ОПТИМИЗАЦИИ ИГРЫ КАРКАССОН} \\
+        \vspace{0.3cm}
+        \fontsize{10pt}{12pt}\selectfont
+        Дипломная работа \\
+        \vspace{1.0cm}
+        \hfill \fontsize{10pt}{12pt}\selectfont
+        \begin{tabular}{l}
+            Научный руководитель: \\
+            ст. преподаватель И. И. Козлов
+        \end{tabular}
+        \vfill
+        Минск, 2025
+    \end{center}
+}
 
 \begin{document}
 
-\begin{frame}
+\begin{frame}[plain]
     \titlepage
 \end{frame}
 
-\begin{frame}{Введение: Настольные игры как бенчмарк ИИ}
+\begin{frame}{Текущее состояние разработки}
+    На текущий момент реализованы следующие компоненты системы:
     \begin{itemize}
-        \item \textbf{Эволюция ИИ:} От детерминированных игр (Шахматы, Го) к стохастическим средам.
-        \item \textbf{Carcassonne (2000):} «Золотой стандарт» современных Eurogames.
-        \item \textbf{Особенности для ИИ:}
+        \item \textbf{Игровой движок (Carcassonne C3):} Полная поддержка правил размещения тайлов, миплов и автоматического подсчета очков.
+        \item \textbf{Интеллектуальные агенты:}
             \begin{itemize}
-                \item Динамическое игровое поле.
-                \item Оптимизация ресурсов (миплы).
-                \item Стохастический выбор (закрытая колода).
+                \item \textbf{MCTS:} Стратегическое планирование с использованием дерева поиска.
+                \item \textbf{Star2.5:} Оптимизированный эвристический поиск.
+                \item \textbf{Hybrid LLM:} Архитектура «Генерал-Солдат», объединяющая LLM (Llama 3.3) и эвристический движок.
+            \end{itemize}
+        \item \textbf{Инфраструктура:}
+            \begin{itemize}
+                \item MCP-сервер для взаимодействия модели с состоянием игры.
+                \item Система централизованной телеметрии и сбора данных для обучения.
             \end{itemize}
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Структура игрового процесса}
-    \begin{columns}
-        \begin{column}{0.6\textwidth}
-            Каждый ход состоит из 3 фаз:
-            \begin{enumerate}
-                \item \textbf{Размещение тайла:} Соблюдение топологической связности.
-                \item \textbf{Размещение мипла:} Захват объектов (дороги, города, монастыри, поля).
-                \item \textbf{Подсчет и возврат:} Получение очков и освобождение ресурсов.
-            \end{enumerate}
-        \end{column}
-        \begin{column}{0.4\textwidth}
-            \includegraphics[width=\textwidth]{carcassonne_rules.jpeg}
-        \end{column}
-    \end{columns}
+\begin{frame}{Анализ эффективности моделей: Успешность ходов}
+    \begin{center}
+    \begin{tikzpicture}
+    \begin{axis}[
+        ybar,
+        ylabel={Процент успешных ходов (\%)},
+        symbolic x coords={Greedy, Hybrid (Local), Hybrid (Cloud), LLM Alone},
+        xtick=data,
+        nodes near coords,
+        nodes near coords align={vertical},
+        ymin=0, ymax=110,
+        width=10cm,
+        height=6cm,
+        bar width=25pt,
+    ]
+    \addplot coordinates {(Greedy,100) (Hybrid (Local),90) (Hybrid (Cloud),90) (LLM Alone,0)};
+    \end{axis}
+    \end{tikzpicture}
+    \end{center}
+    \footnotesize \textit{LLM Alone не справляется с жесткими правилами (Invalid JSON/Coordinates), тогда как Гибридная модель решает «Action Gap».}
 \end{frame}
 
-\begin{frame}{Экономика ресурсов и стратегическая глубина}
+\begin{frame}{Результаты турнира (21 ход)}
+    \begin{center}
+    \begin{tikzpicture}
+    \begin{axis}[
+        ybar,
+        ylabel={Набранные очки},
+        symbolic x coords={GreedyPlayer, Cloud\_General (70B)},
+        xtick=data,
+        nodes near coords,
+        ymin=0, ymax=30,
+        width=8cm,
+        height=6cm,
+        bar width=35pt,
+    ]
+    \addplot[fill=blue!50] coordinates {(GreedyPlayer,22) (Cloud\_General (70B),20)};
+    \end{axis}
+    \end{tikzpicture}
+    \end{center}
+    \footnotesize \textit{Гибридный агент Cloud\_General показывает конкурентоспособный результат, уступая эвристическому GreedyPlayer всего на 2 очка.}
+\end{frame}
+
+\begin{frame}{Архитектура «Генерал-Солдат»}
+    Решение проблемы «Action Gap» через разделение уровней абстракции:
     \begin{itemize}
-        \item \textbf{Лимит миплов:} Всего 7 подданных на всю игру.
-        \item \textbf{Проблема «замораживания»:} Риск потери мобильности на долгостроях.
-        \item \textbf{Конкуренция:} Механики слияния и разделения объектов.
-        \item \textbf{Мета-игра:} Блокировка соперника («мертвые города») и психологическое давление.
+        \item \textbf{Уровень Стратега (LLM):} Анализ ситуации на поле, выбор глобальной цели (блокировка, экспансия, накопление очков).
+        \item \textbf{Уровень Тактика (Code/Heuristic):} Поиск конкретных координат на сетке, соответствующих приказу «Генерала».
     \end{itemize}
+    \begin{center}
+        \includegraphics[height=3cm]{architecture_schema.jpeg}
+    \end{center}
 \end{frame}
 
-\begin{frame}{Система подсчета очков (Таксономия)}
-    \begin{table}
-        \begin{tabular}{|l|l|l|}
-        \hline
-        \textbf{Объект} & \textbf{Очки} & \textbf{Сложность ИИ} \\ \hline
-        Дороги & 1/тайл & Низкая (Тактика) \\ \hline
-        Города & 2/тайл + бонусы & Средняя (Геометрия) \\ \hline
-        Монастыри & 9 (фикс) & Средняя (Окружение) \\ \hline
-        Поля & 3 за кажд. город & Высокая (Стратегия) \\ \hline
-        \end{tabular}
-    \end{table}
-\end{frame}
-
-\begin{frame}{Комбинаторная сложность}
-    \begin{itemize}
-        \item \textbf{Пространство состояний:} $\sim 10^{40}$ (нижняя граница).
-        \item \textbf{Дерево игры:} $\sim 10^{194}$.
-        \item \textbf{Branching Factor:} До 500+ вариантов на один ход в середине партии.
-        \item \textbf{Сравнение с шахматами:} Сложнее из-за динамического поля и стохастичности.
-    \end{itemize}
-\end{frame}
-
-\begin{frame}{Проблематика алгоритмического решения}
-    \begin{itemize}
-        \item \textbf{Action Gap:} Разрыв между стратегическим планом ИИ и тактическим выбором координат.
-        \item \textbf{Неопределенность:} Неизвестности будущего тайла требует вероятностного анализа.
-        \item \textbf{Ограничения MCTS:} Стохастический шум мешает оценке долгосрочных полевых стратегий.
-    \end{itemize}
-\end{frame}
-
-\begin{frame}{Сравнительный анализ подходов}
+\begin{frame}{Задачи на финальном этапе}
     \begin{enumerate}
-        \item \textbf{Эвристики (Star2.5):} Быстро, но предсказуемо и без стратегии.
-        \item \textbf{MCTS:} Мощный поиск, но «шумный» в Каркассоне.
-        \item \textbf{Hybrid AI (LLM + Logic):}
-            \begin{itemize}
-                \item \textbf{Генерал (LLM):} Стратегическое планирование.
-                \item \textbf{Солдат (Logic):} Тактическое исполнение.
-            \end{itemize}
-    \end{enumerate}
-\end{frame}
-
-\begin{frame}{Цели и задачи исследования}
-    \textbf{Цель:} Разработка гибридной архитектуры ИИ (LLM + MCTS) для оптимизации стратегии.
-    \vspace{0.3cm}
-    \textbf{Задачи:}
-    \begin{enumerate}
-        \item Реализация MCP-сервера для игрового движка.
-        \item Разработка агента «Генерал-Солдат».
-        \item Исследование методик \textbf{Tree of Thoughts} и \textbf{Reflexion}.
-        \item Сравнительный анализ эффективности в турнирах.
+        \item \textbf{Fine-tuning промптов:} Улучшение точности стратегических советов через Tree of Thoughts.
+        \item \textbf{Автоматизация обучения:} Использование накопленных логов телеметрии для In-Context Learning.
+        \item \textbf{Аналитика:} Проведение масштабных турниров (100+ партий) для получения статистически значимых данных.
+        \item \textbf{Завершение текста диссертации:} Описание результатов экспериментов в Главах 2 и 3.
     \end{enumerate}
 \end{frame}
 
