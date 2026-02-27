@@ -168,7 +168,8 @@ class PIL_Renderer:
         for x in range(min_x - 1, max_x + 2):
             tx, _ = get_t_pos(x, max_y + 1)
             draw.line([tx, 0, tx, height_tiles * cls.TILE_SIZE], fill=grid_color, width=1)
-            draw.text((tx + 5, 5), str(x), fill=label_color)
+            # Label at the bottom
+            draw.text((tx + 5, height_tiles * cls.TILE_SIZE - 20), str(x), fill=label_color)
             
         # Horizontal lines and Y labels
         for y in range(min_y - 1, max_y + 2):
@@ -637,6 +638,7 @@ if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0", 
         server_port=7860,
+        auth=(os.environ.get("GRADIO_USER", "admin"), os.environ.get("GRADIO_PASSWORD", "carcassonne2024")),
         css="""
         .hint-box { background: var(--amber-50); padding: 5px 10px; border-radius: 8px; border-left: 4px solid var(--amber-500); margin-top: 5px; font-size: 0.85em; }
         #human_controls { border: 1px solid var(--primary-500); padding: 10px; border-radius: 12px; background: var(--background-fill-primary); }
