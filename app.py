@@ -698,6 +698,11 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
             return gr.update(visible=True), gr.update(visible=False), msg
         return gr.update(), gr.update(), msg
 
+    def refresh_logs():
+        files = game_telemetry.list_logs()
+        if not files: return gr.update(choices=[], value=None), "No logs found yet."
+        return gr.update(choices=files, value=files[0]), f"Found {len(files)} log files."
+
     # 1. Auth UI
     with gr.Column(elem_id="login_container") as auth_panel:
         with gr.Column() as login_p:
@@ -769,7 +774,16 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
                     To use the AI with LLM reasoning, ensuring the **HF_TOKEN** secret is set in your Space Settings.
                     1. Go to [Hugging Face Settings](https://huggingface.co/settings/tokens).
                     2. Set the token as a 'Secret' in your Space Settings so the app can access it automatically.
+                    3. Ensure the `UserAuthManager` DB is backed up if you restart the Space.
                     """)
+                
+                with gr.Accordion("📊 Telemetry & Data Research", open=False):
+                    gr.Markdown("### 📥 Download Game Logs for Analysis")
+                    gr.Markdown("Extract raw `.jsonl` data for Tree-of-Thought analysis or custom fine-tuning.")
+                    log_dropdown = gr.Dropdown(label="Select Log File")
+                    btn_refresh_logs = gr.Button("🔄 Refresh List")
+                    log_download = gr.File(label="Download Result")
+                    log_status = gr.Markdown("Click refresh to see latest logs.")
                 
         # Function wiring: unpack all 7 outputs
         UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_meeple_dd, human_tile_display, human_hint_md]
@@ -785,6 +799,10 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
         btn_reset.click(fn=reset_game, inputs=[player1_dd, player2_dd], outputs=UI_OUTPUTS)
         player1_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd], outputs=UI_OUTPUTS)
         player2_dd.change(fn=change_agents, inputs=[player1_dd, player2_dd], outputs=UI_OUTPUTS)
+        
+        # Telemetry wiring
+        btn_refresh_logs.click(fn=refresh_logs, inputs=[], outputs=[log_dropdown, log_status])
+        log_dropdown.change(fn=lambda x: x, inputs=[log_dropdown], outputs=[log_download])
         
         # Init
         demo.load(fn=reset_game, inputs=[player1_dd, player2_dd], outputs=UI_OUTPUTS)

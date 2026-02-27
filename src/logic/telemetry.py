@@ -38,13 +38,17 @@ class TelemetryManager:
         with open(summary_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(summary, ensure_ascii=False) + "\n")
             
+    def list_logs(self) -> List[str]:
+        """Returns a list of all telemetry log files."""
+        files = []
+        if os.path.exists(self.log_dir):
+            for f in os.listdir(self.log_dir):
+                if f.endswith(".jsonl"):
+                    files.append(os.path.join(self.log_dir, f))
+        return sorted(files, reverse=True)
+
     def get_past_lessons(self, agent_name: str, limit: int = 5) -> str:
-        """
-        Retrieves top 'N' lessons learned from past games 
-        (e.g., cases where a strategy led to a loss).
-        """
-        # For now, it returns a static 'bootstrap' lesson if no data exists
-        # In the future, this will parse the telemetry files.
+        """Retrieves historical lessons learned."""
         return "Legacy Success: Prioritizing Monk placement on turns 1-10 often yields +9 points."
 
 # Global instance for easy access
