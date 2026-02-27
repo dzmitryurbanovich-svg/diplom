@@ -147,15 +147,26 @@ class PIL_Renderer:
                             hx = tx + cls.TILE_SIZE // 2 + int(dist * math.cos(angle)) - 5
                             hy = ty + cls.TILE_SIZE // 2 + int(dist * math.sin(angle)) - 5
                             
+                            # Use player color for hint
+                            hint_color = (255, 209, 102, 255) # Golden for "you can place here"
                             draw.ellipse([hx, hy, hx+10, hy+10], fill=hint_color, outline="white")
                             draw.text((hx+2, hy-12), str(seg_idx), fill="white")
 
-            # DRAW COORDINATE GRID LABELS (Subtle)
-            for gx in range(min_x, max_x + 1):
-                for gy in range(min_y, max_y + 1):
-                    tx, ty = cls.get_t_pos(gx, gy)
-                    # Small grey coordinate label in top-left
-                    draw.text((tx + 4, ty + 2), f"{gx},{gy}", fill=(180, 180, 180, 120))
+        # Draw Coordinate Grid
+        grid_color = (100, 104, 112, 120)
+        label_color = (200, 204, 212, 255)
+        
+        # Vertical lines and X labels
+        for x in range(min_x - 1, max_x + 2):
+            tx, _ = get_t_pos(x, max_y + 1)
+            draw.line([tx, 0, tx, height_tiles * cls.TILE_SIZE], fill=grid_color, width=1)
+            draw.text((tx + 5, 5), f"x:{x}", fill=label_color)
+            
+        # Horizontal lines and Y labels
+        for y in range(min_y - 1, max_y + 2):
+            _, ty = get_t_pos(min_x - 1, y)
+            draw.line([0, ty, width_tiles * cls.TILE_SIZE, ty], fill=grid_color, width=1)
+            draw.text((5, ty + 5), f"y:{y}", fill=label_color)
 
         return canvas, (min_x, max_x, min_y, max_y)
 
@@ -439,19 +450,19 @@ def _unpack_ui_state(gs):
         tile_html_val = f'''
         <div style="text-align:center;">
             <p><b>Draw: {t.name}</b></p>
-            <div style="display: inline-block; transform: rotate({rot}deg); transition: transform 0.3s; margin-bottom: 10px;">
+            <div style="display: inline-block; transform: rotate({rot}deg); transition: transform 0.3s;">
                 <img src="{b64}" width="120" style="margin: 0 auto; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));"/>
             </div>
-            <p style="font-size: 0.85em; color: #888; margin-bottom: 5px;">📍 Click the silver ghost spots on the board!</p>
-            <p style="font-size: 0.9em; font-weight: bold;">Rotation: {rot}°</p>
+            <p style="font-size: 0.8em; color: #666; margin-top: 10px;">📍 Click the silver ghost spots on the board!</p>
+            <p>Rotation: {rot}°</p>
         </div>
         '''
         
         if not gs.human_selected_coords:
-            coord_val = "" # Removed text as requested
+            coord_val = "📍 Click the board below"
             hint_val = "💡 <b>Tip:</b> If moves list is empty, try <b>🔄 Rotating</b> the tile!"
         else:
-            coord_val = "" # Removed "Selected" text as requested
+            coord_val = f"✅ Selected: **({gs.human_selected_coords})**"
             hint_val = "📝 <b>Next:</b> Choose if you want to place a 👤 <b>Meeple</b>, then click <b>Confirm Move</b>."
         
         meeple_choices = ["None"] + [f"{s.type.name} - {i}" for i, s in enumerate(t.segments)]
@@ -460,7 +471,6 @@ def _unpack_ui_state(gs):
     return (
         img, log, stats,
         gr.update(visible=controls_visible),
-        gr.update(value=coord_val),
         gr.update(choices=meeple_choices, value=meeple_val),
         gr.update(value=tile_html_val),
         gr.update(value=hint_val)
@@ -600,14 +610,13 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
                     with gr.Column(scale=2):
                         with gr.Group():
                             btn_rotate = gr.Button("🔄 Rotate Tile", variant="secondary")
-                            human_coord_display = gr.Markdown("📍 **Select a location**")
                             human_meeple_dd = gr.Dropdown(label="👤 Meeple Target")
                             human_submit = gr.Button("✅ Confirm Move", variant="primary", elem_classes=["lg-btn"])
                 gr.Markdown("---")
             # ------------------------------------------
             
-    # Function wiring: unpack all 8 outputs
-    UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_coord_display, human_meeple_dd, human_tile_display, human_hint_md]
+    # Function wiring: unpack all 7 outputs
+    UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_meeple_dd, human_tile_display, human_hint_md]
     
     btn_start.click(fn=game_loop, inputs=[], outputs=UI_OUTPUTS)
     btn_rotate.click(fn=rotate_tile, inputs=[], outputs=UI_OUTPUTS)
