@@ -195,16 +195,16 @@ class PIL_Renderer:
         for x in range(min_x - 1, max_x + 2):
             tx, ty = get_t_pos(x, max_y + 1)
             draw.line([tx, 0, tx, height_tiles * cls.TILE_SIZE], fill=grid_color, width=1)
-            # Center label in slot
-            lx, ly = tx + cls.TILE_SIZE // 2 - 5, height_tiles * cls.TILE_SIZE - 20
+            # Position at the bottom-left of the grid cell
+            lx, ly = tx + 5, height_tiles * cls.TILE_SIZE - 20
             draw.text((lx, ly), str(x), fill=label_color)
             
         # Horizontal lines and Y labels (on the left)
         for y in range(min_y - 1, max_y + 2):
             _, ty = get_t_pos(min_x - 1, y)
             draw.line([0, ty, width_tiles * cls.TILE_SIZE, ty], fill=grid_color, width=1)
-            # Center label in slot
-            lx, ly = 5, ty + cls.TILE_SIZE // 2 - 5
+            # Position at the bottom-left of the grid cell
+            lx, ly = 5, ty + cls.TILE_SIZE - 20
             draw.text((lx, ly), str(y), fill=label_color)
 
         return canvas, (min_x, max_x, min_y, max_y)
