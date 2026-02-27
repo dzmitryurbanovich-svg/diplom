@@ -164,18 +164,18 @@ class PIL_Renderer:
         grid_color = (100, 104, 112, 120)
         label_color = (200, 204, 212, 255)
         
-        # Vertical lines and X labels
+        # Vertical lines and X labels (at the bottom)
         for x in range(min_x - 1, max_x + 2):
             tx, _ = get_t_pos(x, max_y + 1)
             draw.line([tx, 0, tx, height_tiles * cls.TILE_SIZE], fill=grid_color, width=1)
-            # Label at the bottom
-            draw.text((tx + 5, height_tiles * cls.TILE_SIZE - 20), str(x), fill=label_color)
+            # Center label in tile slot
+            draw.text((tx + cls.TILE_SIZE // 2 - 5, height_tiles * cls.TILE_SIZE - 20), str(x), fill=label_color)
             
-        # Horizontal lines and Y labels
+        # Horizontal lines and Y labels (on the left)
         for y in range(min_y - 1, max_y + 2):
             _, ty = get_t_pos(min_x - 1, y)
             draw.line([0, ty, width_tiles * cls.TILE_SIZE, ty], fill=grid_color, width=1)
-            draw.text((5, ty + 5), str(y), fill=label_color)
+            draw.text((5, ty + cls.TILE_SIZE // 2 - 5), str(y), fill=label_color)
 
         return canvas, (min_x, max_x, min_y, max_y)
 
@@ -615,6 +615,21 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
                             human_submit = gr.Button("✅ Confirm Move", variant="primary", elem_classes=["lg-btn"])
                 gr.Markdown("---")
             # ------------------------------------------
+            
+            with gr.Accordion("📖 Help & Token Guide", open=False):
+                gr.Markdown("""
+                ### 👤 How to Play
+                1. Click on the **silver ghost tiles** on the board to select a location.
+                2. Use the **🔄 Rotate** button to change tile orientation (ghost positions will update).
+                3. Choose a **Meeple Target** if you want to place a follower.
+                4. Click **✅ Confirm Move**.
+                
+                ### 🔑 Using Hybrid LLM
+                To use the AI with LLM reasoning, you need a **Hugging Face Token**:
+                1. Go to [Hugging Face Tokens](https://huggingface.co/settings/tokens).
+                2. Create a 'Read' token and paste it above.
+                3. **Pro Tip:** Set `HF_TOKEN` as a 'Secret' in your Space Settings to skip this step!
+                """)
             
     # Function wiring: unpack all 7 outputs
     UI_OUTPUTS = [board_view, logs_view, stats_view, human_panel, human_meeple_dd, human_tile_display, human_hint_md]
