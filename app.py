@@ -8,6 +8,8 @@ import base64
 import os
 from PIL import Image, ImageDraw, ImageOps
 import io
+import json
+import hashlib
 
 ASSETS_CACHE = {}
 ASSETS_PIL = {}
@@ -626,6 +628,7 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
         with gr.Row():
             blog = gr.Button("🔓 Login", variant="primary")
             breg = gr.Button("📝 Register", variant="secondary")
+        gr.Markdown("ℹ️ *First time? Enter any login/password and click **Register**.*")
         amsg = gr.Markdown("")
         
     # 2. Main Game UI
