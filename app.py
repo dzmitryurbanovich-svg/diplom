@@ -147,10 +147,15 @@ class PIL_Renderer:
                             hx = tx + cls.TILE_SIZE // 2 + int(dist * math.cos(angle)) - 5
                             hy = ty + cls.TILE_SIZE // 2 + int(dist * math.sin(angle)) - 5
                             
-                            # Use player color for hint
-                            hint_color = (255, 209, 102, 255) # Golden for "you can place here"
                             draw.ellipse([hx, hy, hx+10, hy+10], fill=hint_color, outline="white")
                             draw.text((hx+2, hy-12), str(seg_idx), fill="white")
+
+            # DRAW COORDINATE GRID LABELS (Subtle)
+            for gx in range(min_x, max_x + 1):
+                for gy in range(min_y, max_y + 1):
+                    tx, ty = cls.get_t_pos(gx, gy)
+                    # Small grey coordinate label in top-left
+                    draw.text((tx + 4, ty + 2), f"{gx},{gy}", fill=(180, 180, 180, 120))
 
         return canvas, (min_x, max_x, min_y, max_y)
 
@@ -434,19 +439,19 @@ def _unpack_ui_state(gs):
         tile_html_val = f'''
         <div style="text-align:center;">
             <p><b>Draw: {t.name}</b></p>
-            <div style="display: inline-block; transform: rotate({rot}deg); transition: transform 0.3s;">
+            <div style="display: inline-block; transform: rotate({rot}deg); transition: transform 0.3s; margin-bottom: 10px;">
                 <img src="{b64}" width="120" style="margin: 0 auto; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));"/>
-                <p style="font-size: 0.8em; color: #666; margin-top: 5px;">📍 Click the silver ghost spots on the board!</p>
             </div>
-            <p>Rotation: {rot}°</p>
+            <p style="font-size: 0.85em; color: #888; margin-bottom: 5px;">📍 Click the silver ghost spots on the board!</p>
+            <p style="font-size: 0.9em; font-weight: bold;">Rotation: {rot}°</p>
         </div>
         '''
         
         if not gs.human_selected_coords:
-            coord_val = "📍 Click the board below"
+            coord_val = "" # Removed text as requested
             hint_val = "💡 <b>Tip:</b> If moves list is empty, try <b>🔄 Rotating</b> the tile!"
         else:
-            coord_val = f"✅ Selected: **({gs.human_selected_coords})**"
+            coord_val = "" # Removed "Selected" text as requested
             hint_val = "📝 <b>Next:</b> Choose if you want to place a 👤 <b>Meeple</b>, then click <b>Confirm Move</b>."
         
         meeple_choices = ["None"] + [f"{s.type.name} - {i}" for i, s in enumerate(t.segments)]
