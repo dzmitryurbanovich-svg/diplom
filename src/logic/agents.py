@@ -148,16 +148,46 @@ class HybridLLMAgent(CarcassonneAgent):
         if not legal_moves:
             return 0, 0, 0, None
             
-        board_txt = board.render_ascii()
         strategy = self._get_llm_strategy(tile.name, legal_moves, current_meeples, remaining_tiles)
         
-        # Apply the strategy heuristically
+        # --- SOLDIER LOGIC: Execute General's Strategy ---
         best_move = legal_moves[0]
         best_meeple = None
+        best_tactical_score = -1
         
-        # If strategy is GREEDY or no strict target found, fallback to basic greedy meeple logic
-        best_move = random.choice(legal_moves)
-        if current_meeples > 0 and random.random() < 0.2:
-            return best_move[0], best_move[1], best_move[2], random.randint(0, len(tile.segments) - 1)
+        # We look for the best move that aligns with the General's command
+        for tx, ty, rot in legal_moves:
+            score = 0
+            meeple_idx = None
             
-        return best_move[0], best_move[1], best_move[2], None
+            # Heuristic: Check how many neighbors match the chosen strategy
+            # (Simplified: we count how many adjacent tiles exist to ensure connectivity)
+            neighbors = sum(1 for dx, dy in [(0,1), (1,0), (0,-1), (-1,0)] if (tx+dx, ty+dy) in board.grid)
+            score += neighbors
+            
+            # Tactical Meeple Placement based on Strategy
+            if current_meeples > 0:
+                for i, seg in enumerate(tile.segments):
+                    if strategy == "CITY" and seg.type.name == "CITY":
+                        score += 15 # High priority for city expansion
+                        meeple_idx = i
+                        break
+                    elif strategy == "ROAD" and seg.type.name == "ROAD":
+                        score += 8 # Priority for road expansion
+                        meeple_idx = i
+                        break
+                    elif strategy == "GREEDY":
+                        if seg.type.name in ["CITY", "MONASTERY"]:
+                            score += 5
+                            meeple_idx = i
+                            break
+                        elif seg.type.name == "ROAD":
+                            score += 2
+                            meeple_idx = i
+            
+            if score > best_tactical_score:
+                best_tactical_score = score
+                best_move = (tx, ty, rot)
+                best_meeple = meeple_idx
+                
+        return best_move[0], best_move[1], best_move[2], best_meeple
