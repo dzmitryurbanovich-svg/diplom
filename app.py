@@ -11,6 +11,8 @@ from PIL import Image, ImageDraw, ImageOps
 import io
 import json
 import hashlib
+import secrets
+import re
 
 ASSETS_CACHE = {}
 ASSETS_PIL = {}
@@ -25,28 +27,68 @@ if not HF_TOKEN_DEFAULT and os.path.exists(".hf_token"):
 
 class UserAuthManager:
     DB_PATH = "users_db.json"
+    
     @classmethod
     def _load(cls):
         if not os.path.exists(cls.DB_PATH): return {}
         try:
             with open(cls.DB_PATH, "r") as f: return json.load(f)
         except: return {}
+        
     @classmethod
     def _save(cls, db):
         with open(cls.DB_PATH, "w") as f: json.dump(db, f)
+
+    @staticmethod
+    def is_valid_email(email):
+        pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+        return re.match(pattern, email) is not None
+
     @classmethod
-    def register(cls, username, password):
-        if not username or not password: return "❌ Username/password empty."
+    def register(cls, email, password):
+        if not email or not password: return "❌ Email/password empty."
+        if not cls.is_valid_email(email): return "❌ Invalid email format."
+        
         db = cls._load()
-        if username in db: return "❌ User already exists."
-        db[username] = hashlib.sha256(password.encode()).hexdigest()
+        if email in db: return "❌ User already exists."
+        
+        token = secrets.token_hex(4).upper() # 8-char code
+        db[email] = {
+            "pwd": hashlib.sha256(password.encode()).hexdigest(),
+            "verified": False,
+            "token": token
+        }
         cls._save(db)
-        return "✅ Registered! Please click Login."
+        
+        # Mock email sending
+        print(f"\n[EMAIL MOCK] To: {email}")
+        print(f"[EMAIL MOCK] Subject: Verify your account")
+        print(f"[EMAIL MOCK] Message: Your verification code is: {token}")
+        print(f"[EMAIL MOCK] Link: http://localhost:7860/?verify={token}\n")
+        
+        return f"✅ Registered! A verification code was sent to {email}. Please enter it below or check logs."
+
     @classmethod
-    def login(cls, username, password):
+    def verify_token(cls, email, token):
         db = cls._load()
-        if username not in db: return False
-        return db[username] == hashlib.sha256(password.encode()).hexdigest()
+        if email not in db: return "❌ Email not found."
+        user = db[email]
+        if user["token"] == token.strip().upper():
+            user["verified"] = True
+            cls._save(db)
+            return "✅ Account verified! You can now login."
+        return "❌ Invalid verification code."
+
+    @classmethod
+    def login(cls, email, password):
+        db = cls._load()
+        if email not in db: return False, "❌ Email not found."
+        user = db[email]
+        if user["pwd"] != hashlib.sha256(password.encode()).hexdigest():
+            return False, "❌ Incorrect password."
+        if not user.get("verified", False):
+            return False, "⚠️ Account not verified. Please check your email."
+        return True, "✅ Success"
 
 def load_assets():
     tiles_dir = "assets/tiles"
@@ -617,23 +659,49 @@ AGENT_CHOICES = ["Human", "Greedy", "Star2.5", "MCTS", "Hybrid LLM"]
 
 with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
     # 1. Login Logic
-    def handle_login(name, pwd):
-        if UserAuthManager.login(name, pwd):
-            return gr.update(visible=False), gr.update(visible=True), ""
-        return gr.update(), gr.update(), "❌ Invalid credentials."
+    current_user_email = gr.BrowserState("")
 
-    def handle_register(name, pwd):
-        msg = UserAuthManager.register(name, pwd)
-        return msg
+    def handle_login(email, pwd):
+        success, msg = UserAuthManager.login(email, pwd)
+        if success:
+            return gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), ""
+        
+        if "Account not verified" in msg:
+            return gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), msg
+            
+        return gr.update(), gr.update(), gr.update(), msg
 
-    with gr.Column(elem_id="login_container") as login_p:
-        gr.Markdown("# 🔐 Carcassonne Login")
-        u = gr.Textbox(label="Username")
-        p = gr.Textbox(label="Password", type="password")
-        with gr.Row():
-            blog = gr.Button("🔓 Login", variant="primary")
-            breg = gr.Button("📝 Register", variant="secondary")
-        gr.Markdown("ℹ️ *First time? Enter any login/password and click **Register**.*")
+    def handle_register(email, pwd):
+        msg = UserAuthManager.register(email, pwd)
+        if "✅" in msg:
+            return email, gr.update(visible=False), gr.update(visible=True), msg
+        return "", gr.update(), gr.update(), msg
+
+    def handle_verify(email, code):
+        msg = UserAuthManager.verify_token(email, code)
+        if "✅" in msg:
+            return gr.update(visible=True), gr.update(visible=False), msg
+        return gr.update(), gr.update(), msg
+
+    # 1. Auth UI
+    with gr.Column(elem_id="login_container") as auth_panel:
+        with gr.Column() as login_p:
+            gr.Markdown("# 🔐 Carcassonne Login")
+            u = gr.Textbox(label="Email")
+            p = gr.Textbox(label="Password", type="password")
+            with gr.Row():
+                blog = gr.Button("🔓 Login", variant="primary")
+                breg = gr.Button("📝 Register", variant="secondary")
+            gr.Markdown("ℹ️ *Enter your email to login or register.*")
+            
+        with gr.Column(visible=False) as verify_p:
+            gr.Markdown("# 📧 Verify Your Email")
+            gr.Markdown("We've sent a code to your email. Please enter it below to activate your account.")
+            v_email = gr.Textbox(label="Email", interactive=False)
+            v_code = gr.Textbox(label="Verification Code", placeholder="E.g. A1B2C3D4")
+            bver = gr.Button("✅ Verify Account", variant="primary")
+            bback = gr.Button("⬅️ Back to Login", variant="ghost")
+
         amsg = gr.Markdown("")
         
     # 2. Main Game UI
@@ -707,8 +775,21 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
         demo.load(fn=reset_game, inputs=[player1_dd, player2_dd], outputs=UI_OUTPUTS)
 
     # Auth Buttons wiring
-    blog.click(fn=handle_login, inputs=[u, p], outputs=[login_p, main_p, amsg])
-    breg.click(fn=handle_register, inputs=[u, p], outputs=[amsg])
+    blog.click(fn=handle_login, inputs=[u, p], outputs=[login_p, verify_p, main_p, amsg])
+    breg.click(fn=handle_register, inputs=[u, p], outputs=[v_email, login_p, verify_p, amsg])
+    bver.click(fn=handle_verify, inputs=[v_email, v_code], outputs=[login_p, verify_p, amsg])
+    bback.click(fn=lambda: (gr.update(visible=True), gr.update(visible=False), ""), inputs=[], outputs=[login_p, verify_p, amsg])
+
+    # Browser initialization (URL param check)
+    def on_load(request: gr.Request):
+        params = request.query_params
+        if "verify" in params:
+            token = params["verify"]
+            # We don't know the email here easily, but we can show verify panel
+            return gr.update(visible=False), gr.update(visible=True), f"🔗 Link detected! Please confirm your email and click Verify."
+        return gr.update(), gr.update(), ""
+    
+    demo.load(fn=on_load, inputs=[], outputs=[login_p, verify_p, amsg])
 
 if __name__ == "__main__":
     demo.launch(
