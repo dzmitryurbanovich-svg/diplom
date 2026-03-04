@@ -57,6 +57,8 @@ class Board:
         }
         self.monasteries: Dict[Tuple[int, int], Optional[str]] = {}  # Track (x, y) -> player who owns meeple
         self.segment_counter = 0
+        self.scores = {"Player1": 0, "Player2": 0}
+        self.meeple_counts = {"Player1": 7, "Player2": 7}
 
     def _get_next_segment_id(self) -> str:
         self.segment_counter += 1
@@ -87,6 +89,30 @@ class Board:
                         return False # Mismatch!
         
         return has_adj
+
+    def get_legal_moves(self, tile: Tile) -> List[Tuple[int, int, int]]:
+        """Returns all legal placements (x, y, rotation) for a given tile."""
+        legal_moves = []
+        if not self.grid:
+            for r in [0, 90, 180, 270]:
+                legal_moves.append((0, 0, r))
+            return legal_moves
+        
+        candidates = set()
+        for (x, y) in self.grid:
+            for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+                pos = (x + dx, y + dy)
+                if pos not in self.grid:
+                    candidates.add(pos)
+        
+        # Test all 4 rotations
+        for x, y in candidates:
+            for _ in range(4):
+                if self.is_legal_move(x, y, tile):
+                    legal_moves.append((x, y, tile.rotation))
+                tile.rotate(1)
+        
+        return legal_moves
 
     def place_tile(self, x: int, y: int, tile: Tile) -> bool:
         """Places a tile on the board if the move is legal."""
@@ -134,7 +160,7 @@ class Board:
 
     def place_meeple(self, x: int, y: int, segment_index: int, player_name: str) -> bool:
         """Places a meeple on a specific segment of a tile if the feature is unoccupied."""
-        if (x, y) not in self.grid:
+        if (x, y) not in self.grid or self.meeple_counts.get(player_name, 0) <= 0:
             return False
             
         tile = self.grid[(x, y)]
@@ -151,6 +177,7 @@ class Board:
                 return False
             self.monasteries[(x, y)] = player_name
             segment.meeple_player = player_name
+            self.meeple_counts[player_name] -= 1
             return True
             
         if segment.type not in self.dsu:
@@ -162,6 +189,7 @@ class Board:
             
         self.dsu[segment.type].meeples[root][player_name] = 1
         segment.meeple_player = player_name
+        self.meeple_counts[player_name] -= 1
         return True
 
     def is_completed(self, segment_id: str, segment_type: SegmentType) -> bool:
@@ -183,19 +211,25 @@ class Board:
             for root, edges in list(dsu.open_edges.items()):
                 if edges == 0 and len(dsu.meeples.get(root, {})) > 0:
                     completed_roots[seg_type].add(root)
-                    # Score it
                     pts_per_tile = 2 if seg_type == SegmentType.CITY else 1
                     pts = (dsu.size[root] + dsu.pennants[root]) * pts_per_tile
                     
-                    completed.append({
-                        "type": seg_type.name,
-                        "points": pts,
-                        "meeples": dict(dsu.meeples[root])
-                    })
-                    # Return meeples
+                    meeples = dict(dsu.meeples[root])
+                    completed.append({"type": seg_type.name, "points": pts, "meeples": meeples})
+                    
+                    # Update scores (majority rule)
+                    max_m = max(meeples.values())
+                    winners = [p for p, c in meeples.items() if c == max_m]
+                    for w in winners:
+                        self.scores[w] = self.scores.get(w, 0) + pts
+                    
+                    # Return meeples to players
+                    for p, count in meeples.items():
+                        self.meeple_counts[p] = self.meeple_counts.get(p, 0) + count
+                    
                     dsu.meeples[root] = {}
                     
-        # Visually remove meeples from board for completed standard features
+        # Visually remove meeples from board
         if completed_roots[SegmentType.CITY] or completed_roots[SegmentType.ROAD]:
             for (x, y), tile in self.grid.items():
                 for seg in tile.segments:
@@ -206,21 +240,12 @@ class Board:
         # Check monasteries
         for (mx, my), owner in list(self.monasteries.items()):
             if owner is not None:
-                # Count surrounding tiles
-                count = 0
-                for dx in [-1, 0, 1]:
-                    for dy in [-1, 0, 1]:
-                        if (mx + dx, my + dy) in self.grid:
-                            count += 1
+                count = sum(1 for dx in [-1,0,1] for dy in [-1,0,1] if (mx+dx, my+dy) in self.grid)
                 if count == 9:
-                    completed.append({
-                        "type": "MONASTERY",
-                        "points": 9,
-                        "meeples": {owner: 1}
-                    })
-                    # Return meeple
+                    completed.append({"type": "MONASTERY", "points": 9, "meeples": {owner: 1}})
+                    self.scores[owner] = self.scores.get(owner, 0) + 9
+                    self.meeple_counts[owner] = self.meeple_counts.get(owner, 0) + 1
                     self.monasteries[(mx, my)] = None
-                    # Visually remove meeple from the tile segment
                     tile = self.grid[(mx, my)]
                     for seg in tile.segments:
                         if (getattr(seg, 'is_monastery', False) or seg.type == SegmentType.MONASTERY) and seg.meeple_player:
@@ -232,33 +257,29 @@ class Board:
         """Scores all incomplete features and fields at the end of the game."""
         results = []
         
-        # Incomplete Cities (1pt/tile) and Roads (1pt/tile)
+        # Incomplete Cities/Roads
         for seg_type in [SegmentType.CITY, SegmentType.ROAD]:
             dsu = self.dsu[seg_type]
             for root, edges in list(dsu.open_edges.items()):
                 if edges > 0 and len(dsu.meeples.get(root, {})) > 0:
-                    pts = (dsu.size[root] + dsu.pennants[root]) * 1 # 1 pt for incomplete
-                    results.append({
-                        "type": f"INCOMPLETE_{seg_type.name}",
-                        "points": pts,
-                        "meeples": dict(dsu.meeples[root])
-                    })
+                    pts = (dsu.size[root] + dsu.pennants[root]) * 1
+                    meeples = dict(dsu.meeples[root])
+                    results.append({"type": f"INCOMPLETE_{seg_type.name}", "points": pts, "meeples": meeples})
+                    
+                    max_m = max(meeples.values())
+                    for p in [p for p, c in meeples.items() if c == max_m]:
+                        self.scores[p] = self.scores.get(p, 0) + pts
 
         # Incomplete Monasteries
         for (mx, my), owner in list(self.monasteries.items()):
             if owner is not None:
-                count = sum(1 for dx in [-1,0,1] for dy in [-1,0,1] if (mx+dx, my+dy) in self.grid)
-                results.append({
-                    "type": "INCOMPLETE_MONASTERY",
-                    "points": count,
-                    "meeples": {owner: 1}
-                })
+                pts = sum(1 for dx in [-1,0,1] for dy in [-1,0,1] if (mx+dx, my+dy) in self.grid)
+                results.append({"type": "INCOMPLETE_MONASTERY", "points": pts, "meeples": {owner: 1}})
+                self.scores[owner] = self.scores.get(owner, 0) + pts
 
-        # Fields (3 pts per completed city bordering the field)
+        # Fields
         field_dsu = self.dsu[SegmentType.FIELD]
         city_dsu = self.dsu[SegmentType.CITY]
-        
-        # Map each field root to the set of completed city roots it touches
         field_to_cities = {root: set() for root in field_dsu.meeples.keys() if len(field_dsu.meeples[root]) > 0}
         
         for (x, y), tile in self.grid.items():
@@ -267,12 +288,10 @@ class Board:
             for seg in tile.segments:
                 if seg.type == SegmentType.FIELD:
                     r = field_dsu.find(seg.id)
-                    if r in field_to_cities:
-                        field_roots.add(r)
+                    if r in field_to_cities: field_roots.add(r)
                 elif seg.type == SegmentType.CITY:
                     r = city_dsu.find(seg.id)
-                    if city_dsu.open_edges[r] == 0: # Must be completed city
-                        city_roots.add(r)
+                    if city_dsu.open_edges[r] == 0: city_roots.add(r)
             
             for f_root in field_roots:
                 for c_root in city_roots:
@@ -281,11 +300,11 @@ class Board:
         for f_root, cities in field_to_cities.items():
             pts = len(cities) * 3
             if pts > 0:
-                results.append({
-                    "type": "FIELD",
-                    "points": pts,
-                    "meeples": dict(field_dsu.meeples[f_root])
-                })
+                meeples = dict(field_dsu.meeples[f_root])
+                results.append({"type": "FIELD", "points": pts, "meeples": meeples})
+                max_m = max(meeples.values())
+                for p in [p for p, c in meeples.items() if c == max_m]:
+                    self.scores[p] = self.scores.get(p, 0) + pts
 
         return results
 

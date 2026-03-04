@@ -1,12 +1,4 @@
-# Stage 1: Build React Frontend
-FROM node:20-slim AS frontend-build
-WORKDIR /app/frontend
-COPY frontend/package*.json ./
-RUN npm install
-COPY frontend/ ./
-RUN npm run build
-
-# Stage 2: Backend & Final Image
+# Backend & Final Image
 FROM python:3.11-slim
 WORKDIR /app
 
@@ -24,8 +16,10 @@ COPY src/ ./src/
 COPY assets/ ./assets/
 COPY server.py .
 
-# Copy built frontend from Stage 1
-COPY --from=frontend-build /app/frontend/dist ./frontend/dist
+# Copy pre-built frontend from host
+# Ensure 'npm run build' was executed locally before deploy
+COPY frontend/dist/ ./frontend/dist/
+RUN ls -R frontend/dist
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1

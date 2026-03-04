@@ -10,6 +10,11 @@ export const authLogin = async (email: string, password: string) => {
     return res.data;
 };
 
+export const authRegister = async (email: string, password: string) => {
+    const res = await CLIENT.post('/auth/register', { email, password });
+    return res.data;
+};
+
 export const startNewGame = async (p1_type: string, p2_type: string) => {
     const res = await CLIENT.post('/game/new', { p1_type, p2_type });
     return res.data.session_id;

@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from huggingface_hub import HfApi
 
 # Ensure the token is available
@@ -26,18 +27,21 @@ try:
             "requirements.txt", 
             "src/**", 
             "assets/**", 
-            "frontend/**",
+            "frontend/dist/**",
             "Dockerfile"
         ],
         ignore_patterns=[
             "venv/**",
+            "frontend/src/**",
             "frontend/node_modules/**",
-            "frontend/dist/**",
             "__pycache__/**",
             "*.pyc",
             ".git/**"
         ],
-        commit_message="🚀 Deploying Phase 6: React + FastAPI Integration with Modern UI"
+        delete_patterns=[
+            "frontend/dist/assets/*"
+        ],
+        commit_message=f"🚀 Deploying React+FastAPI: Force Sync Assets {int(time.time())}"
     )
     print("\n[SUCCESS] Deployment complete!")
     print(f"Your app is now live at: https://huggingface.co/spaces/{repo_id}")

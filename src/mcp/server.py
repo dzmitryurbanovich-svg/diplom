@@ -174,28 +174,11 @@ async def handle_call_tool(
         if tile_name not in DECK_DEFINITIONS:
             return [types.TextContent(type="text", text=f"Error: Tile '{tile_name}' not found.")]
         
-        # Simple brute-force scanner for legal moves around existing tiles
-        legal_moves = []
-        # In a real game, we'd check all empty neighbors of occupied cells
-        to_check = set()
-        if not board.grid:
-            to_check.add((0, 0))
-        else:
-            for (x, y) in board.grid:
-                for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
-                    if (x + dx, y + dy) not in board.grid:
-                        to_check.add((x + dx, y + dy))
+        tile = DECK_DEFINITIONS[tile_name]()
+        moves = board.get_legal_moves(tile)
         
-        for tx, ty in to_check:
-            for rot in [0, 90, 180, 270]:
-                test_tile = DECK_DEFINITIONS[tile_name]()
-                test_tile.rotate(rot // 90)
-                if board.is_legal_move(tx, ty, test_tile):
-                    legal_moves.append({"x": tx, "y": ty, "rotation": rot})
-        
-        import sys
-        print(f"[*] Returning {len(legal_moves)} legal moves for {tile_name}", file=sys.stderr)
-        return [types.TextContent(type="text", text=json.dumps(legal_moves))]
+        res = [{"x": x, "y": y, "rotation": r} for (x, y, r) in moves]
+        return [types.TextContent(type="text", text=json.dumps(res))]
 
     elif name == "place_tile":
         try:
@@ -273,25 +256,18 @@ async def handle_call_tool(
 
     elif name == "get_tactical_advice":
         tile_name = arguments.get("tile_name")
-        # Reuse legal move logic
-        legal_moves = []
-        to_check = set()
-        for (x, y) in board.grid:
-            for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
-                if (x + dx, y + dy) not in board.grid:
-                    to_check.add((x + dx, y + dy))
+        if tile_name not in DECK_DEFINITIONS:
+            return [types.TextContent(type="text", text=f"Error: Tile '{tile_name}' not found.")]
+            
+        tile = DECK_DEFINITIONS[tile_name]()
+        moves = board.get_legal_moves(tile)
         
         evaluations = []
-        for tx, ty in to_check:
-            for rot in [0, 90, 180, 270]:
-                test_tile = DECK_DEFINITIONS[tile_name]()
-                test_tile.rotate(rot // 90)
-                if board.is_legal_move(tx, ty, test_tile):
-                    # Basic score heuristic
-                    score = sum(1 for dx, dy in [(0,1), (1,0), (0,-1), (-1,0)] if (tx+dx, ty+dy) in board.grid)
-                    evaluations.append({"x": tx, "y": ty, "rot": rot, "tactical_value": score})
+        for x, y, r in moves:
+            # Basic score heuristic: count adjacent tiles
+            score = sum(1 for dx, dy in [(0,1), (1,0), (0,-1), (-1,0)] if (x+dx, y+dy) in board.grid)
+            evaluations.append({"x": x, "y": y, "rotation": r, "tactical_value": score})
         
-        # Sort and return top 5
         evaluations.sort(key=lambda x: x["tactical_value"], reverse=True)
         return [types.TextContent(type="text", text=json.dumps(evaluations[:5], indent=2))]
 
