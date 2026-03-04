@@ -1,66 +1,57 @@
+# 🏰 Carcassonne AI Tournament Engine
+
+🛡️ **Modern Web Stack**: React + Vite + Tailwind CSS v4 & FastAPI  
+🤖 **Advanced AI**: MCTS, Greedy, and Hybrid LLM (Llama-3-70B via MCP)  
+🚀 **Interactive UI**: High-speed Canvas rendering with Pan & Zoom  
+
+An advanced digital implementation of the classic board game *Carcassonne*, specifically designed as a testing ground for various AI strategies and as part of a graduation thesis.
+
 ---
-title: Carcassonne AI
-emoji: 🏰
-colorFrom: blue
-colorTo: green
-sdk: docker
-pinned: false
+
+## ✨ Key Features
+
+- **High-Performance Rendering**: Abandoned server-side Pillow rendering for client-side CSS/Canvas rendering.
+- **Interactive Board**: Full Pan & Zoom support using `react-zoom-pan-pinch`.
+- **Hybrid AI Strategy**: Combines heuristic tree search (MCTS) with LLM-based high-level strategic planning.
+- **Full Ruleset Support**: Accurate implementation of Roads, Cities, Monasteries, and Fields (Farmers).
+- **Telemetry & Logging**: Detailed JSON-based logging of every move for future model training (RLHF).
+
 ---
 
-# Carcassonne AI: Hybrid Tournament Engine 🏰
+## 🏗️ Architecture
 
-Данный проект — это полнофункциональная система для проведения автономных и гибридных турниров по настольной игре **Каркассон**, разработанная в рамках дипломной работы.
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4, Lucide Icons.
+- **Backend**: FastAPI (Python 3.11), Uvicorn, Pydantic.
+- **Engine**: Custom graph-based DSU (Disjoint Set Union) for territory management and scoring.
+- **Deployment**: Multi-stage Docker build hosted on Hugging Face Spaces.
 
-## 🚀 Основные возможности
+## 🛠️ Usage (Local Development)
 
-- **Гибридный ИИ**: Сочетание классического поиска (**MCTS**, **Heuristic Search**) и современной логики на базе больших языковых моделей (**LLM**) через Hugging Face Inference API.
-- **Интерактивный интерфейс**: Построен на **Gradio**, включает визуализацию игрового поля в стиле Chess UI, подсказки для постановки миплов и координатную сетку.
-- **Безопасность**: Встроенная система регистрации и входа для пользователей с хранением хешированных паролей.
-- **Полная автоматизация**: Автономный игровой цикл, где ИИ-агенты сражаются друг с другом без вмешательства человека.
+### Prerequisites
+- Python 3.11+
+- Node.js 20+
 
-## 🏗 Структура репозитория
-
-- `app.py`: Главный файл приложения и UI (Gradio).
-- `src/logic/`: Ядро игры (движок, правила, генерация ходов).
-- `src/mcp/`: Реализация **Model Context Protocol (MCP)** сервера для интеграции с LLM.
-- `demos/`: Скрипты для тестирования, проведения турниров и демонстрации работы агентов.
-- `assets/`: Графические ресурсы (тайлы, фишки игроков).
-- `thesis/`: Текст дипломной работы (LaTeX).
-- `docs/literature/`: Справочные материалы и научные статьи.
-
-## 🛠 Быстрый запуск
-
-### 1. Установка зависимостей
+### 1. Setup Backend
 ```bash
+python -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
+python server.py
 ```
 
-### 2. Запуск основного интерфейса
+### 2. Setup Frontend
 ```bash
-python app.py
-```
-После запуска перейдите по адресу `http://localhost:7860`.
-
-### 3. Запуск MCP-сервера (Research Mode)
-Если вам нужно использовать сервер отдельно для интеграции с Клодом или другими клиентами:
-```bash
-PYTHONPATH=. python src/mcp/server.py
+cd frontend
+npm install
+npm run dev
 ```
 
-### 4. Тестирование и Демо
-В папке `demos/` находятся скрипты для проверки различных аспектов системы:
-- `python demos/demo_engine.py`: Тест логики движка.
-- `python demos/tournament_runner.py`: Запуск автоматического турнира.
-- `python demos/test_mcp_client.py`: Тест JSON-RPC интерфейса.
+Visit `http://localhost:5173` to play!
 
-### 🔑 Инструкция по входу
-При первом запуске:
-1. Введите любое имя и пароль.
-2. Нажмите **📝 Register**.
-3. Нажмите **🔓 Login**.
+---
 
-### 🤖 Настройка LLM
-Для использования **Hybrid LLM** агента добавьте ваш `HF_TOKEN` в секреты вашего Space на Hugging Face или создайте локальный файл `.hf_token`.
+## 🎓 Academic Context
+This project serves as a practical demonstration for a diploma thesis on AI optimization in board games. It provides a robust framework for benchmarking MCTS against LLM-driven agents.
 
-## ☁️ Развертывание (Hugging Face Spaces)
-Приложение полностью готово к запуску в Docker-контейнере на HF Spaces. Используйте `deploy_to_hf.py` для автоматизации процесса или просто подключите репозиторий.
+## 📝 License
+GPL-3.0 License.

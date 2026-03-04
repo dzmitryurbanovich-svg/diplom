@@ -1,8 +1,9 @@
-mcp[sse]==1.26.0
-starlette==0.52.1
-uvicorn==0.41.0
-huggingface-hub
-gradio
-httpx==0.28.1
-python-dotenv==1.2.1
-Pillow
+numpy
+pillow>=10.0.0
+fastapi
+uvicorn
+pydantic
+asyncer
+httpx
+typing-extensions
+python-multipart
