@@ -253,7 +253,7 @@ class GameState:
         random.shuffle(self.deck)
         
         # Starter tile always at 0, 0
-        starter_idx = next(i for i, t in enumerate(self.deck) if t.name == "Starter")
+        starter_idx = next(i for i, t in enumerate(self.deck) if t.name == "Tile_Starter")
         starter = self.deck.pop(starter_idx)
         self.board.place_tile(0, 0, starter)
         
