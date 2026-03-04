@@ -106,15 +106,13 @@ def load_assets():
 load_assets()
 
 TILE_LETTER_MAP = {
-    "Monastery_Road": "A", "Monastery_Field": "B", "City4_Shield": "C",
-    "City1_RoadStraight": "D", "City1_Fields": "E", "City2_Opposite_Shield": "F",
-    "City2_Opposite": "G", "City2_Curve": "H", "City2_Curve_Shield": "I",
-    "City1_RoadCurve": "J", "City1_RoadCurve_Mirror": "K", "City2_Curve_Road": "L",
-    "City2_Curve_Road_Shield": "M", "City2_Curve_Road_NoShield": "N",
-    "City1_RoadStraight_Shield": "O", "Crossroad": "P", "TJunction": "Q",
-    "RoadStraight": "R", "RoadCurve": "S", "City3": "T", "City3_Shield": "U",
-    "City3_Road": "V", "City3_Road_Shield": "W", "CityOpposite_Road": "X",
-    "Starter": "D", "CityAdj": "H"
+    "Tile_A": "A", "Tile_B": "B", "Tile_C": "C", "Tile_D": "D",
+    "Tile_E": "E", "Tile_F": "F", "Tile_G": "G", "Tile_H": "H",
+    "Tile_I": "I", "Tile_J": "J", "Tile_K": "K", "Tile_L": "L",
+    "Tile_M": "M", "Tile_N": "N", "Tile_O": "O", "Tile_P": "P",
+    "Tile_Q": "Q", "Tile_R": "R", "Tile_S": "S", "Tile_T": "T",
+    "Tile_U": "U", "Tile_V": "V", "Tile_W": "W", "Tile_X": "X",
+    "Tile_Starter": "D"
 }
 
 class PIL_Renderer:

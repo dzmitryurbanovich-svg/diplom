@@ -13,95 +13,98 @@ def create_deck() -> list[Tile]:
         for _ in range(count):
             deck.append(build_tile(name, [TileSegment(t, s, p, m) for t, s, p, m in segments], center))
 
-    # format of segments: (Type, [Sides], has_pennant, is_monastery)
-    # Fields must be separated if a road or city divides them
-
-    # A (x2): Monastery with road. Field surrounds.
-    add(2, "Monastery_Road", [(F, [N,E,W], False, False), (R, [S], False, False)], M)
+    # A (x2): Monastery with road. Field surrounds. Road is SOUTH.
+    add(2, "Tile_A", [(F, [N,E,W], False, False), (R, [S], False, False)], M)
     
     # B (x4): Monastery full field
-    add(4, "Monastery_Field", [(F, [N,E,S,W], False, False)], M)
+    add(4, "Tile_B", [(F, [N,E,S,W], False, False)], M)
     
     # C (x1): Full City with shield
-    add(1, "City4_Shield", [(C, [N,E,S,W], True, False)], C)
+    add(1, "Tile_C", [(C, [N,E,S,W], True, False)], C)
     
-    # D (x4): City top, Road straight Left-Right. 2 Fields (top under city is blocked, so one field above road, one below).
-    # Wait, city is N. Road is E, W. Field below city is connected. Field south of road is separate.
-    # Actually, road E-W splits the tile. N is city. So one field between City and Road, one field South.
-    # But for simplicity in sides: Field1 has no sides (trapped), Field2 has [S].
-    # Let's assign Field1 to [N] corners? DSU only merges based on Side. Since Field1 doesn't touch any outer edge besides E-W corners, we can just say Field(None) for internal, but we need outer merging.
-    # Standard simplification: The field S of city touches E and W NORTH of the road. Side model only supports 4 sides. 
-    # To fix field merging, our engine merges fields only if they specify the same Side.
-    # In a basic 4-side model, fields on the "corners" can't be perfectly modeled without corner definitions.
-    # Workaround: we'll define fields by the sides they dominate.
-    add(4, "City1_RoadStraight", [(C, [N], False, False), (R, [E,W], False, False), (F, [S], False, False)])
+    # D (x4): City N. Road E, W. Fields S, and underneath City.
+    add(4, "Tile_D", [(C, [N], False, False), (R, [E,W], False, False), (F, [S], False, False)])
 
-    # E (x5): City top, Field everywhere else
-    add(5, "City1_Fields", [(C, [N], False, False), (F, [E,S,W], False, False)])
+    # E (x5): City N. Field E, S, W.
+    add(5, "Tile_E", [(C, [N], False, False), (F, [E,S,W], False, False)])
 
-    # F (x2): City E & W (disconnected), Shield
-    add(2, "City2_Opposite_Shield", [(C, [E], True, False), (C, [W], False, False), (F, [N,S], False, False)])
+    # F (x2): City E, W (disconnected). Shield. Fields N, S.
+    add(2, "Tile_F", [(C, [E], True, False), (C, [W], False, False), (F, [N,S], False, False)])
     
-    # G (x1): City E & W (disconnected), no shield
-    add(1, "City2_Opposite", [(C, [E], False, False), (C, [W], False, False), (F, [N,S], False, False)])
+    # G (x1): City E, W (disconnected). Fields N, S.
+    add(1, "Tile_G", [(C, [E], False, False), (C, [W], False, False), (F, [N,S], False, False)])
     
-    # H (x3): City N & E (connected). 1 Field.
-    add(3, "City2_Curve", [(C, [N,E], False, False), (F, [S,W], False, False)])
+    # H (x3): City N, S (disconnected). Fields E, W.
+    add(3, "Tile_H", [(C, [N], False, False), (C, [S], False, False), (F, [E,W], False, False)])
     
-    # I (x2): City N & E (connected), Shield.
-    add(2, "City2_Curve_Shield", [(C, [N,E], True, False), (F, [S,W], False, False)])
+    # I (x2): City N & W (connected). Field E & S. Shield.
+    # Note: PNG visual actually implies city on TWO edges. Let's assume N and W are City.
+    # Actually from python output earlier: N=CITY, E=FIELD, S=FIELD, W=CITY.
+    add(2, "Tile_I", [(C, [N,W], True, False), (F, [E,S], False, False)])
 
-    # J (x3): City N, Road S-E. 2 Fields (one large, one small internal)
-    add(3, "City1_RoadCurve", [(C, [N], False, False), (R, [E,S], False, False), (F, [W], False, False)])
+    # J (x3): City N. Road E & S. Fields W and inner.
+    # From script: N=CITY, E=ROAD, S=ROAD, W=FIELD
+    add(3, "Tile_J", [(C, [N], False, False), (R, [E,S], False, False), (F, [W], False, False)])
 
-    # K (x3): City N, Road S-W. 2 Fields. (Same as J but mirrored)
-    add(3, "City1_RoadCurve_Mirror", [(C, [N], False, False), (R, [W,S], False, False), (F, [E], False, False)])
+    # K (x3): City N. Road S & W. Fields E and inner.
+    # From script: N=CITY, E=FIELD, S=ROAD, W=ROAD
+    add(3, "Tile_K", [(C, [N], False, False), (R, [S,W], False, False), (F, [E], False, False)])
 
-    # L (x3): City N & E (connected), Road S-W. 2 Fields.
-    add(3, "City2_Curve_Road", [(C, [N,E], False, False), (R, [S,W], False, False), (F, [], False, False)]) # Fields don't easily touch edges here in 4-side model.
+    # L (x3): City N. Road E, S, W. Field split.
+    # From script: N=CITY, E=ROAD, S=ROAD, W=ROAD
+    add(3, "Tile_L", [(C, [N], False, False), (R, [E,S,W], False, False), (F, [], False, False)])
 
-    # M (x2): City N & W (connected), Shield, Road S-E.
-    add(2, "City2_Curve_Road_Shield", [(C, [N,W], True, False), (R, [S,E], False, False), (F, [], False, False)])
+    # M (x2): City N, E (connected). Shield. Fields S, W.
+    # From script: N=CITY, E=CITY, S=FIELD, W=FIELD
+    add(2, "Tile_M", [(C, [N,E], True, False), (F, [S,W], False, False)])
 
-    # N (x3): City N & W (connected), Road S-E.
-    add(3, "City2_Curve_Road_NoShield", [(C, [N,W], False, False), (R, [S,E], False, False), (F, [], False, False)])
+    # N (x3): City N, E (connected). Fields S, W.
+    # From script: N=CITY, E=CITY, S=FIELD, W=FIELD
+    add(3, "Tile_N", [(C, [N,E], False, False), (F, [S,W], False, False)])
     
-    # O (x2): City N & W (connected), Shield, Road S-W.
-    add(2, "City1_RoadStraight_Shield", [(C, [N,W], True, False), (R, [S,E], False, False)])
+    # O (x2): City N, W (connected). Road E, S. Shield.
+    # From script: N=CITY, E=ROAD, S=ROAD, W=CITY
+    add(2, "Tile_O", [(C, [N,W], True, False), (R, [E,S], False, False), (F, [], False, False)])
 
-    # P (x3): City N, Road N-S? No, a 3-way city cap?
-    # Let's add remaining generic tiles to reach 72. 
-    # 4-way crossroad
-    add(1, "Crossroad", [(R, [N], False, False),(R, [E], False, False),(R, [S], False, False),(R, [W], False, False), (F, [], False, False)])
+    # P (x3): City N, W (connected). Road E, S.
+    # From script: N=CITY, E=ROAD, S=ROAD, W=CITY
+    add(3, "Tile_P", [(C, [N,W], False, False), (R, [E,S], False, False), (F, [], False, False)])
+
+    # Q (x1): City N, E, W. Shield. 
+    # From script: N=CITY, E=CITY, S=FIELD, W=CITY
+    add(1, "Tile_Q", [(C, [N,E,W], True, False), (F, [S], False, False)])
+
+    # R (x3): City N, E, W.
+    # From script: N=CITY, E=CITY, S=FIELD, W=CITY
+    add(3, "Tile_R", [(C, [N,E,W], False, False), (F, [S], False, False)])
+
+    # S (x2): City N, E, W. Road S. Shield.
+    # From script: N=CITY, E=CITY, S=ROAD, W=CITY
+    add(2, "Tile_S", [(C, [N,E,W], True, False), (R, [S], False, False)])
+
+    # T (x1): City N, E, W. Road S.
+    # From script: N=CITY, E=CITY, S=ROAD, W=CITY
+    add(1, "Tile_T", [(C, [N,E,W], False, False), (R, [S], False, False)])
     
-    # 3-way T-junction
-    add(4, "TJunction", [(R, [E], False, False),(R, [S], False, False),(R, [W], False, False), (F, [N], False, False)])
-    
-    # Straight road
-    add(8, "RoadStraight", [(R, [N,S], False, False), (F, [E], False, False), (F, [W], False, False)])
+    # U (x8): Road N, S.
+    # From script: N=ROAD, E=FIELD, S=ROAD, W=FIELD
+    add(8, "Tile_U", [(R, [N,S], False, False), (F, [E], False, False), (F, [W], False, False)])
 
-    # Curve road
-    add(9, "RoadCurve", [(R, [S,W], False, False), (F, [N,E], False, False)])
+    # V (x9): Road S, W.
+    # From script: N=FIELD, E=FIELD, S=ROAD, W=ROAD
+    add(9, "Tile_V", [(R, [S,W], False, False), (F, [N,E], False, False)])
 
-    # 3-sided city
-    add(3, "City3", [(C, [N,E,W], False, False), (F, [S], False, False)])
-    
-    # 3-sided city + shield
-    add(1, "City3_Shield", [(C, [N,E,W], True, False), (F, [S], False, False)])
+    # W (x4): Road E, S, W. (T-Junction)
+    # From script: N=FIELD, E=ROAD, S=ROAD, W=ROAD
+    add(4, "Tile_W", [(R, [E,S,W], False, False), (F, [N], False, False)])
 
-    # 3-sided city with road ending
-    add(1, "City3_Road", [(C, [N,E,W], False, False), (R, [S], False, False)])
-    
-    # 3-sided city with road ending + shield
-    add(2, "City3_Road_Shield", [(C, [N,E,W], True, False), (R, [S], False, False)])
+    # X (x1): Road N, E, S, W. (Crossroad)
+    # From script: N=ROAD, E=ROAD, S=ROAD, W=ROAD
+    add(1, "Tile_X", [(R, [N], False, False), (R, [E], False, False), (R, [S], False, False), (R, [W], False, False), (F, [], False, False)])
 
-    # 2 cities opposite (N, S), Road Straight E, W
-    add(3, "CityOpposite_Road", [(C, [N], False, False), (C, [S], False, False), (R, [E,W], False, False)])
-
-    # We use one of the "City1_RoadStraight" tiles as the starter tile later.
-    # Total tiles: 2+4+1+4+5+2+1+3+2+3+3+3+2+3+2+1+4+8+9+3+1+1+2+3 = 71
-    # Adding 1 extra City1_RoadStraight to act as the exact Starter tile = 72
-    add(1, "Starter", [(C, [N], False, False), (R, [E,W], False, False), (F, [S], False, False)])
+    # Starter Tile is Tile D exactly.
+    # Total = 2+4+1+4+5+2+1+3+2+3+3+3+2+3+2+3+1+3+2+1+8+9+4+1 = 71
+    add(1, "Tile_Starter", [(C, [N], False, False), (R, [E,W], False, False), (F, [S], False, False)])
     
     return deck
 
