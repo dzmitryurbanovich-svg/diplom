@@ -664,8 +664,8 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
     def handle_login(email, pwd):
         success, msg = UserAuthManager.login(email, pwd)
         if success:
-            return gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), ""
-        return gr.update(), gr.update(), gr.update(), msg
+            return gr.update(visible=False), gr.update(visible=True), ""
+        return gr.update(), gr.update(), msg
 
     def handle_register(email, pwd):
         msg = UserAuthManager.register(email, pwd)
@@ -790,7 +790,7 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
         demo.load(fn=reset_game, inputs=[player1_dd, player2_dd], outputs=UI_OUTPUTS)
 
     # Auth Buttons wiring
-    blog.click(fn=handle_login, inputs=[u, p], outputs=[login_p, verify_p, main_p, amsg])
+    blog.click(fn=handle_login, inputs=[u, p], outputs=[auth_panel, main_p, amsg])
     breg.click(fn=handle_register, inputs=[u, p], outputs=[v_email, login_p, verify_p, amsg])
     bver.click(fn=handle_verify, inputs=[v_email, v_code], outputs=[login_p, verify_p, amsg])
     bback.click(fn=lambda: (gr.update(visible=True), gr.update(visible=False), ""), inputs=[], outputs=[login_p, verify_p, amsg])
@@ -801,10 +801,10 @@ with gr.Blocks(title="Carcassonne AI Tournament Viewer") as demo:
         if "verify" in params:
             token = params["verify"]
             # We don't know the email here easily, but we can show verify panel
-            return gr.update(visible=False), gr.update(visible=True), f"🔗 Link detected! Please confirm your email and click Verify."
-        return gr.update(), gr.update(), ""
+            return gr.update(visible=True), gr.update(visible=False), gr.update(visible=True), f"🔗 Link detected! Please confirm your email and click Verify."
+        return gr.update(), gr.update(), gr.update(), ""
     
-    demo.load(fn=on_load, inputs=[], outputs=[login_p, verify_p, amsg])
+    demo.load(fn=on_load, inputs=[], outputs=[auth_panel, login_p, verify_p, amsg])
 
 if __name__ == "__main__":
     demo.launch(
