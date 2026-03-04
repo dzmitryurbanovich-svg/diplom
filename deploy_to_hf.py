@@ -22,23 +22,22 @@ try:
         repo_id=repo_id,
         repo_type="space",
         allow_patterns=[
-            "app.py", 
+            "server.py", 
             "requirements.txt", 
             "src/**", 
             "assets/**", 
-            "demos/agents_hf.py", 
-            "demos/agents_baseline.py",
+            "frontend/**",
             "Dockerfile"
         ],
         ignore_patterns=[
             "venv/**",
+            "frontend/node_modules/**",
+            "frontend/dist/**",
             "__pycache__/**",
             "*.pyc",
-            "*.zip",
-            ".git/**",
-            "deployment_package/**"
+            ".git/**"
         ],
-        commit_message="🚀 Deploying Phase 5: High-Fidelity UI with Real Asset Graphics"
+        commit_message="🚀 Deploying Phase 6: React + FastAPI Integration with Modern UI"
     )
     print("\n[SUCCESS] Deployment complete!")
     print(f"Your app is now live at: https://huggingface.co/spaces/{repo_id}")

@@ -49,11 +49,7 @@ class GameSession:
         self.game_over = False
         self.last_played = (0, 0)
         
-        self.hf_token = ""
-        try:
-            with open(".hf_token", "r") as f:
-                self.hf_token = f.read().strip()
-        except: pass
+        self.hf_token = os.environ.get("HF_TOKEN", "")
             
         self.agents = {}
         for p_name, a_str in [("Player1", p1_str), ("Player2", p2_str)]:

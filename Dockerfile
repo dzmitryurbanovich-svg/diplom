@@ -23,7 +23,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 COPY assets/ ./assets/
 COPY server.py .
-COPY .hf_token .
 
 # Copy built frontend from Stage 1
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
