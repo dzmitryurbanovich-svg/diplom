@@ -9,9 +9,10 @@ import asyncer
 from src.logic.engine import Board
 from src.logic.deck import DECK_DEFINITIONS
 from src.logic.agents import GreedyAgent, StarAgent, MCTSAgent, HybridLLMAgent
-from app import UserAuthManager
+from src.logic.auth_manager import UserAuthManager
 import copy
 import random
+import os
 
 app = FastAPI()
 
