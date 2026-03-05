@@ -16,6 +16,22 @@ function App() {
   const [p1, setP1] = useState('Human');
   const [p2, setP2] = useState('Star2.5');
 
+  // ─── Auto-login from localStorage ────────────────────────────────────────────
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('carcassonne_user');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setIsLogged(true);
+    }
+  }, []);
+
+  // Persist user in localStorage on login
+  useEffect(() => {
+    if (isLogged && email) {
+      localStorage.setItem('carcassonne_user', email);
+    }
+  }, [isLogged, email]);
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -28,7 +44,7 @@ function App() {
         alert(res.message);
         if (res.success) setAuthMode('login');
       }
-    } catch (e) {
+    } catch {
       alert("Authentication failed. Is the API running?");
     }
   };
@@ -56,17 +72,32 @@ function App() {
     refreshState(session);
   };
 
-  // Game loop effect
+  const handleAbandon = () => {
+    if (window.confirm("Abandon this match?")) {
+      setSession(null);
+      setGameState(null);
+    }
+  };
+
+  // ─── AI Game Loop — deduplicated, 100ms delay ────────────────────────────────
+  const isFetchingRef = React.useRef(false);
+
   useEffect(() => {
     if (!session || !gameState || gameState.game_over) return;
+    if (gameState.is_human_turn) return;
+    if (isFetchingRef.current) return; // guard against duplicate concurrent requests
 
-    if (!gameState.is_human_turn) {
-      const timer = setTimeout(async () => {
+    const timer = setTimeout(async () => {
+      isFetchingRef.current = true;
+      try {
         await triggerAiStep(session);
-        refreshState(session);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
+        await refreshState(session);
+      } finally {
+        isFetchingRef.current = false;
+      }
+    }, 100); // was 500ms — 5x speed-up for AI-vs-AI games
+
+    return () => clearTimeout(timer);
   }, [session, gameState]);
 
   if (!isLogged) {
@@ -125,6 +156,7 @@ function App() {
             src={heroBg}
             alt="Castle Hero"
             className="absolute inset-0 w-full h-full object-cover opacity-80"
+            loading="eager"
           />
           {/* Overlay Gradient for smooth blending */}
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent z-10" />
@@ -150,7 +182,10 @@ function App() {
               <div className="bg-emerald-500 p-2 rounded-xl shadow-lg shadow-emerald-500/20"><LayoutDashboard size={32} /></div>
               Setup Match
             </h1>
-            <p className="text-slate-400 mb-8 font-medium text-sm">Select your participants for this tournament session.</p>
+            <p className="text-slate-400 mb-2 font-medium text-sm">Select your participants for this tournament session.</p>
+            <p className="text-slate-600 mb-8 text-xs">Logged in as <span className="text-slate-400 font-mono">{email}</span>
+              <button onClick={() => { localStorage.removeItem('carcassonne_user'); setIsLogged(false); }} className="ml-2 text-red-500/60 hover:text-red-400 underline text-[10px]">logout</button>
+            </p>
 
             <div className="space-y-6 mb-8">
               <div className="bg-slate-800/80 p-5 rounded-2xl border border-slate-700/50">
@@ -188,6 +223,7 @@ function App() {
             src={heroBg}
             alt="Castle Hero"
             className="absolute inset-0 w-full h-full object-cover opacity-80"
+            loading="eager"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent z-10" />
           <div className="absolute top-16 right-16 z-20">
@@ -250,7 +286,7 @@ function App() {
         </div>
 
         <button
-          onClick={() => { if (window.confirm("Abandon this match?")) setSession(null); }}
+          onClick={handleAbandon}
           className="mt-4 p-2 bg-red-600/80 hover:bg-red-500 text-white w-full rounded text-xs font-bold transition-all shadow-lg active:scale-95 shrink-0"
         >
           Abandon Match
