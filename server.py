@@ -12,6 +12,7 @@ import random
 
 from src.logic.engine import Board
 from src.logic.deck import DECK_DEFINITIONS
+from src.logic.telemetry import game_telemetry
 from src.logic.agents import GreedyAgent, StarAgent, MCTSAgent, HybridLLMAgent
 from src.logic.auth_manager import UserAuthManager
 import json
@@ -99,9 +100,8 @@ class GameSession:
             self.game_over = True
             self.logs.append("🏁 No legal moves left! Game Over.")
 
-    def execute_move(self, move_coords, rotation, meeple_target):
+    def execute_move(self, move_coords, rotation, meeple_target, strategy=None, rationale=None):
         x, y = move_coords
-        # Rotate tile properly (updates segments)
         while self.pending_tile.rotation != rotation:
             self.pending_tile.rotate(1)
             
@@ -113,7 +113,6 @@ class GameSession:
 
         if meeple_target != "None":
             try:
-                # Handle both "CITY - 0" and plain "0"
                 if "-" in meeple_target:
                     idx = int(meeple_target.split('-')[-1].strip())
                 else:
@@ -127,29 +126,23 @@ class GameSession:
         self.logs.append(log_msg)
         self.board.get_completed_features()
         
-        # Log this move for training data
-        self.log_to_file({
+        # Log this move for training data using unified telemetry
+        game_telemetry.log_turn({
             "player": self.current_player,
             "player_type": self.p1_type if self.current_player == "Player1" else self.p2_type,
             "move": {"x": x, "y": y, "rotation": rotation, "meeple": meeple_target},
-            "timestamp": time.time(),
             "scores": copy.deepcopy(self.board.scores),
-            "deck_remaining": len(self.deck)
-        })
+            "deck_remaining": len(self.deck),
+            "strategy": strategy,
+            "rationale": rationale
+        }, session_id=f"{self.hf_token if self.hf_token else 'dev'}_{id(self)}")
 
         self.current_player = "Player2" if self.current_player == "Player1" else "Player1"
         self.pending_tile = None
         self.pending_legal_moves = []
         return True, ""
 
-    def log_to_file(self, data):
-        """Appends turn data to a JSONL file for the current session."""
-        try:
-            log_path = os.path.join(LOG_DIR, f"session_{self.hf_token if self.hf_token else 'dev'}_{id(self)}.jsonl")
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(data) + "\n")
-        except Exception:
-            pass
+    # Telemetry is now handled via unified logic in execute_move
 
 sessions: Dict[str, GameSession] = {}
 
@@ -198,7 +191,7 @@ def get_state(session_id: str):
     meeple_choices = []
     if gs.pending_tile:
         tile_name = gs.pending_tile.name
-        meeple_choices = [{"index": i, "type": s.type.name, "sides": [side.name for side in s.sides]} for i, s in enumerate(gs.pending_tile.segments)]
+        meeple_choices = [{"index": i, "type": s.type.name, "nodes": s.nodes} for i, s in enumerate(gs.pending_tile.segments)]
 
     return {
         "game_over": gs.game_over, "current_player": gs.current_player, "is_human_turn": gs.agents[gs.current_player] is None,
@@ -238,12 +231,15 @@ async def ai_step_endpoint(session_id: str):
         if len(result) == 4:
             mx, my, mrot, midx = result
         else:
-            # Fallback for old 3-tuple format if any
             move, midx, _ = result
             mx, my, mrot = move
         
+        # Capture strategy and rationale for telemetry
+        strategy = getattr(agent, 'last_strategy', None)
+        rationale = getattr(agent, 'last_rationale', None)
+        
         meeple_str = str(midx) if midx is not None else "None"
-        success, msg = gs.execute_move((mx, my), mrot, meeple_str)
+        success, msg = gs.execute_move((mx, my), mrot, meeple_str, strategy=strategy, rationale=rationale)
         if success: gs.prepare_turn()
         return {"success": success, "message": msg}
     except Exception as e:

@@ -65,7 +65,7 @@ class Board:
         return f"seg_{self.segment_counter}"
 
     def is_legal_move(self, x: int, y: int, tile: Tile) -> bool:
-        """Checks if placing a tile at (x, y) is legal without performing the placement."""
+        """Checks if placing a tile at (x, y) is legal using 12-node matching."""
         if (x, y) in self.grid:
             return False
         
@@ -77,7 +77,7 @@ class Board:
         }
         
         has_adj = False
-        if not self.grid: # First tile is always legal at (0,0)
+        if not self.grid:
             has_adj = True
         else:
             for side, pos in adjacents.items():
@@ -85,8 +85,18 @@ class Board:
                     has_adj = True
                     neighbor = self.grid[pos]
                     neighbor_side = Side((side.value + 2) % 4)
-                    if tile.get_side_type(side) != neighbor.get_side_type(neighbor_side):
-                        return False # Mismatch!
+                    
+                    # 12-node matching logic
+                    # North (0,1,2) connects to neighbor South (8,7,6)
+                    # East (3,4,5) connects to neighbor West (11,10,9)
+                    # etc.
+                    this_nodes = tile.get_side_nodes(side)
+                    neigh_nodes = neighbor.get_side_nodes(neighbor_side)
+                    neigh_nodes.reverse() # Reverse to match node-to-node
+                    
+                    for i in range(3):
+                        if tile.get_node_type(this_nodes[i]) != neighbor.get_node_type(neigh_nodes[i]):
+                            return False
         
         return has_adj
 
@@ -131,23 +141,31 @@ class Board:
             seg_id = self._get_next_segment_id()
             segment.id = seg_id
             p = 1 if segment.has_pennant else 0
-            open_e = len(segment.sides)
+            # Open edges are counted as nodes on the edges (internal junctions not counted here)
+            open_e = len(segment.nodes)
             if segment.type in self.dsu:
                 self.dsu[segment.type].make_set(seg_id, pennants=p, open_edges=open_e)
 
-        # Perform unions with neighbors
+        # Perform unions with neighbors node by node
         for side, pos in adjacents.items():
             if pos in self.grid:
                 neighbor = self.grid[pos]
                 neighbor_side = Side((side.value + 2) % 4)
                 
-                # Find segments on these matching sides
-                seg_this = next((s for s in tile.segments if side in s.sides), None)
-                seg_neigh = next((s for s in neighbor.segments if neighbor_side in s.sides), None)
+                this_nodes = tile.get_side_nodes(side)
+                neigh_nodes = neighbor.get_side_nodes(neighbor_side)
+                neigh_nodes.reverse()
                 
-                if seg_this and seg_neigh and seg_this.type == seg_neigh.type:
-                    if seg_this.type in self.dsu:
-                        self.dsu[seg_this.type].union(seg_this.id, seg_neigh.id)
+                for i in range(3):
+                    n_this = this_nodes[i]
+                    n_neigh = neigh_nodes[i]
+                    
+                    seg_this = next((s for s in tile.segments if n_this in s.nodes), None)
+                    seg_neigh = next((s for s in neighbor.segments if n_neigh in s.nodes), None)
+                    
+                    if seg_this and seg_neigh and seg_this.type == seg_neigh.type:
+                        if seg_this.type in self.dsu:
+                            self.dsu[seg_this.type].union(seg_this.id, seg_neigh.id)
 
         self.grid[(x, y)] = tile
         
@@ -283,19 +301,24 @@ class Board:
         field_to_cities = {root: set() for root in field_dsu.meeples.keys() if len(field_dsu.meeples[root]) > 0}
         
         for (x, y), tile in self.grid.items():
-            field_roots = set()
-            city_roots = set()
+            completed_cities_on_tile = set()
             for seg in tile.segments:
-                if seg.type == SegmentType.FIELD:
-                    r = field_dsu.find(seg.id)
-                    if r in field_to_cities: field_roots.add(r)
-                elif seg.type == SegmentType.CITY:
+                if seg.type == SegmentType.CITY:
                     r = city_dsu.find(seg.id)
-                    if city_dsu.open_edges[r] == 0: city_roots.add(r)
+                    if city_dsu.open_edges[r] == 0:
+                        completed_cities_on_tile.add(r)
             
-            for f_root in field_roots:
-                for c_root in city_roots:
-                    field_to_cities[f_root].add(c_root)
+            # Use node-based adjacency: if a field node is adjacent to a city node 
+            # within the same tile, they are "connected" for scoring.
+            # In Carcassonne, field segments sharing an edge or boundary with a city.
+            # Since our nodes are ON the edges, we check if segments are adjacent in the tile.
+            for f_seg in tile.segments:
+                if f_seg.type == SegmentType.FIELD:
+                    f_root = field_dsu.find(f_seg.id)
+                    if f_root in field_to_cities:
+                        # Simple heuristic: if city is on this tile, it's likely adjacent to the field
+                        for c_root in completed_cities_on_tile:
+                            field_to_cities[f_root].add(c_root)
 
         for f_root, cities in field_to_cities.items():
             pts = len(cities) * 3

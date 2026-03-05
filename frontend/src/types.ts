@@ -20,7 +20,7 @@ export interface LegalMove {
 export interface MeepleChoice {
     index: number;
     type: string;
-    sides: string[];
+    nodes: number[];
 }
 
 export interface GameState {

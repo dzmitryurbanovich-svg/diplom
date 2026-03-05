@@ -25,10 +25,10 @@ from demos.agents_hybrid import HybridAgent
 # ── Tournament settings ────────────────────────────────────────────────────
 NUM_GAMES = 3
 DECK_TEMPLATE = [
-    "starter",
-    "city_road", "city_road", "city_road",
-    "city_road", "city_road", "city_road",
-    "city_road", "city_road",
+    "Tile_Starter",
+    "Tile_D", "Tile_E", "Tile_U",
+    "Tile_V", "Tile_M", "Tile_W",
+    "Tile_A", "Tile_B"
 ]
 
 # ── Helpers ────────────────────────────────────────────────────────────────

@@ -10,28 +10,31 @@ interface GameBoardProps {
 
 const TILE_SIZE = 120;
 
-// Helper to determine meeple visual position based on segment sides
-const getMeeplePosition = (sides: string[]) => {
-    // Basic mapping of sides to percentage offsets
-    // We need to account for tile rotation too if we want absolute precision, 
-    // but the backend sends sides relative to the CURRENT rotation of segments.
+// Helper to determine meeple visual position based on node indices (0-11)
+const getMeeplePosition = (nodes: number[], type?: string) => {
+    if (type === 'MONASTERY' || nodes.length === 0 || nodes.length > 10) {
+        return { top: '50%', left: '50%' }; // Center
+    }
 
-    if (sides.length === 0) return { top: '50%', left: '50%' }; // Center (Monastery/Center)
+    // Map of node index to % offsets (Left, Top)
+    const nodeMap: Record<number, { l: number, t: number }> = {
+        0: { l: 25, t: 12 }, 1: { l: 50, t: 12 }, 2: { l: 75, t: 12 },  // North
+        3: { l: 88, t: 25 }, 4: { l: 88, t: 50 }, 5: { l: 88, t: 75 },  // East
+        6: { l: 75, t: 88 }, 7: { l: 50, t: 88 }, 8: { l: 25, t: 88 },  // South
+        9: { l: 12, t: 75 }, 10: { l: 12, t: 50 }, 11: { l: 12, t: 25 } // West
+    };
 
-    // If multiple sides, average them
-    let top = 0;
-    let left = 0;
-
-    sides.forEach(side => {
-        if (side === 'NORTH') { top += 15; left += 50; }
-        else if (side === 'EAST') { top += 50; left += 85; }
-        else if (side === 'SOUTH') { top += 85; left += 50; }
-        else if (side === 'WEST') { top += 50; left += 15; }
+    let totalL = 0;
+    let totalT = 0;
+    nodes.forEach(node => {
+        const pos = nodeMap[node] || { l: 50, t: 50 };
+        totalL += pos.l;
+        totalT += pos.t;
     });
 
     return {
-        top: `${top / sides.length}%`,
-        left: `${left / sides.length}%`
+        left: `${totalL / nodes.length}%`,
+        top: `${totalT / nodes.length}%`
     };
 };
 
@@ -257,7 +260,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, onMove }) => {
                                                 <>
                                                     {/* Meeple Hotspots */}
                                                     {state.meeples[state.current_player] > 0 && state.meeple_choices.map((choice) => {
-                                                        const pos = getMeeplePosition(choice.sides);
+                                                        const pos = getMeeplePosition(choice.nodes, choice.type);
                                                         const isThisSelected = selectedMeepleIdx === choice.index;
                                                         return (
                                                             <div
@@ -279,7 +282,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, onMove }) => {
                                                         <div
                                                             className="absolute z-40 transition-all duration-300 animate-meeple-pop pointer-events-none"
                                                             style={{
-                                                                ...getMeeplePosition(state.meeple_choices.find(c => c.index === selectedMeepleIdx)?.sides || []),
+                                                                ...getMeeplePosition(state.meeple_choices.find(c => c.index === selectedMeepleIdx)?.nodes || [], state.meeple_choices.find(c => c.index === selectedMeepleIdx)?.type),
                                                                 width: TILE_SIZE * 0.3, height: TILE_SIZE * 0.3,
                                                                 marginLeft: -(TILE_SIZE * 0.15), marginTop: -(TILE_SIZE * 0.15)
                                                             }}

@@ -14,6 +14,7 @@ from src.logic.engine import Board
 from src.logic.deck import DECK_DEFINITIONS
 from src.logic.models import Side, Tile, TileSegment, SegmentType
 from src.mcp.prompts import SYSTEM_PROMPT, TOT_PROMPT_TEMPLATE
+from src.logic.telemetry import game_telemetry
 
 # Global game state (for demo purposes)
 board = Board()
@@ -198,6 +199,10 @@ async def handle_call_tool(
         
         success = board.place_tile(x, y, tile)
         if success:
+            game_telemetry.log_turn({
+                "source": "mcp",
+                "move": {"x": x, "y": y, "rotation": rot, "tile": tile_name}
+            }, session_id="mcp_session")
             return [types.TextContent(type="text", text=f"Success: Placed {tile_name} at ({x}, {y}) with rotation {rot}.")]
         else:
             reason = "Reason unknown"
@@ -227,6 +232,11 @@ async def handle_call_tool(
             
         success = board.place_meeple(x, y, seg_idx, player)
         if success:
+            game_telemetry.log_turn({
+                "source": "mcp",
+                "action": "place_meeple",
+                "x": x, "y": y, "segment_index": seg_idx, "player": player
+            }, session_id="mcp_session")
             return [types.TextContent(type="text", text=f"Success: Meeple placed by {player} on segment {seg_idx}.")]
         return [types.TextContent(type="text", text="Error: Cannot place meeple here (already claimed or invalid).")]
 
@@ -235,9 +245,15 @@ async def handle_call_tool(
         return [types.TextContent(type="text", text=json.dumps(completed))]
 
     elif name == "calculate_score":
-        # Returns the final endgame logic for fields and incomplete cities/roads/cloisters
-        final_scores = board.calculate_final_scores()
-        return [types.TextContent(type="text", text=json.dumps(final_scores))]
+        raw_scores = board.calculate_final_scores()
+        summary = {
+            "total_points": sum(s["points"] for s in raw_scores),
+            "city_points": sum(s["points"] for s in raw_scores if "CITY" in s["type"]),
+            "road_points": sum(s["points"] for s in raw_scores if "ROAD" in s["type"]),
+            "monastery_points": sum(s["points"] for s in raw_scores if "MONASTERY" in s["type"]),
+            "total_tiles_placed": len(board.grid)
+        }
+        return [types.TextContent(type="text", text=json.dumps(summary))]
 
     elif name == "get_strategic_sitrep":
         # Returns a report for the 'General'

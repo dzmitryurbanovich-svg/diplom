@@ -15,13 +15,19 @@ class TelemetryManager:
         self.game_log_path = os.path.join(self.log_dir, f"game_{self.session_id}.jsonl")
         self.current_game_history: List[Dict[str, Any]] = []
 
-    def log_turn(self, turn_data: Dict[str, Any]):
+    def log_turn(self, turn_data: Dict[str, Any], session_id: Optional[str] = None):
         """Logs a single turn's state, action, and rationale."""
         turn_data["timestamp"] = datetime.now().isoformat()
         self.current_game_history.append(turn_data)
         
-        # Append to individual game file
-        with open(self.game_log_path, "a", encoding="utf-8") as f:
+        # Determine log path
+        if session_id:
+            path = os.path.join(self.log_dir, f"session_{session_id}.jsonl")
+        else:
+            path = self.game_log_path
+
+        # Append to log file
+        with open(path, "a", encoding="utf-8") as f:
             f.write(json.dumps(turn_data, ensure_ascii=False) + "\n")
 
     def finalize_game(self, final_scores: Dict[str, int], winner: str):
@@ -47,9 +53,26 @@ class TelemetryManager:
                     files.append(os.path.join(self.log_dir, f))
         return sorted(files, reverse=True)
 
-    def get_past_lessons(self, agent_name: str, limit: int = 5) -> str:
-        """Retrieves historical lessons learned."""
-        return "Legacy Success: Prioritizing Monk placement on turns 1-10 often yields +9 points."
+    def get_past_lessons(self, agent_name: str, limit: int = 3) -> str:
+        """Retrieves historical lessons learned from past wins."""
+        summary_path = os.path.join(self.log_dir, "summary_stats.jsonl")
+        if not os.path.exists(summary_path):
+            return "Legacy Success: Initial cities provide strong foundation in early game."
+            
+        lessons = []
+        try:
+            with open(summary_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    data = json.loads(line)
+                    if data.get("winner") == agent_name:
+                        lessons.append(f"Win on {data['timestamp'][:10]}: Score {data['final_scores'].get(agent_name)}")
+            
+            if lessons:
+                return "Past Victories: " + " | ".join(lessons[-limit:])
+        except Exception:
+            pass
+            
+        return "Tactical Note: Controlling the center of the board increases connectivity options."
 
 # Global instance for easy access
 game_telemetry = TelemetryManager()

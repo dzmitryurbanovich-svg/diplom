@@ -115,9 +115,11 @@ class HybridLLMAgent(CarcassonneAgent):
     def __init__(self, name: str, hf_token: str):
         super().__init__(name)
         self.token = hf_token
+        self.last_strategy = "GREEDY"
+        self.last_rationale = ""
 
-    def _get_llm_strategy(self, tile_name: str, legal_moves: List, current_meeples: int, remaining_tiles: int) -> str:
-        if not self.token.strip(): return "GREEDY"
+    def _get_llm_strategy(self, tile_name: str, legal_moves: List, current_meeples: int, remaining_tiles: int) -> Tuple[str, str]:
+        if not self.token.strip(): return "GREEDY", "No API token provided."
         
         # PERSISTENT LEARNING: Load lessons from past games
         past_lessons = game_telemetry.get_past_lessons(self.name)
@@ -134,36 +136,40 @@ class HybridLLMAgent(CarcassonneAgent):
         prompt = f"<s>[INST] <<SYS>>\n{SYSTEM_PROMPT}\n\nPast Lessons Learned:\n{past_lessons}\n<</SYS>>\n\n{user_content}[/INST]"
         
         headers = {"Authorization": f"Bearer {self.token.strip()}"}
-        payload = {"inputs": prompt, "parameters": {"return_full_text": False, "max_new_tokens": 50, "stop": ["\n\n"]} }
+        payload = {"inputs": prompt, "parameters": {"return_full_text": False, "max_new_tokens": 100, "stop": ["\n\n"]} }
         
         try:
             response = httpx.post(HF_API_URL, headers=headers, json=payload, timeout=30.0)
             result = response.json()
-            if isinstance(result, list): text = result[0].get('generated_text', '').strip().upper()
-            else: text = result.get('generated_text', '').strip().upper()
+            if isinstance(result, list): text = result[0].get('generated_text', '').strip()
+            else: text = result.get('generated_text', '').strip()
             
             # Extract order and rationale
             order = "GREEDY"
             for k in ["CITY", "ROAD", "MONASTERY", "GREEDY", "BLOCKING"]:
-                if k in text:
+                if k in text.upper():
                     order = k
                     break
             
-            # Log the General's Rationale if present
-            if "RATIONALE:" in text:
-                rationale = text.split("RATIONALE:")[-1].strip()
-                print(f"[GENERAL {self.name}] Order: {order} | Rationale: {rationale}")
+            rationale = "No explicit rationale provided by LLM."
+            if "RATIONALE:" in text.upper():
+                rationale = text.upper().split("RATIONALE:")[-1].strip()
                 
-            return order
+            self.last_strategy = order
+            self.last_rationale = rationale
+            print(f"[GENERAL {self.name}] Order: {order} | Rationale: {rationale}")
+            return order, rationale
         except Exception as e:
             print(f"LLM Error: {e}")
-            return "GREEDY"
+            self.last_strategy = "GREEDY"
+            self.last_rationale = f"Error communicating with LLM: {str(e)}"
+            return "GREEDY", self.last_rationale
 
     def select_move(self, board: Board, tile: Tile, legal_moves: List[Tuple[int, int, int]], current_meeples: int, remaining_tiles: int = 72) -> Tuple[int, int, int, Optional[int]]:
         if not legal_moves:
             return 0, 0, 0, None
             
-        strategy = self._get_llm_strategy(tile.name, legal_moves, current_meeples, remaining_tiles)
+        strategy, rationale = self._get_llm_strategy(tile.name, legal_moves, current_meeples, remaining_tiles)
         
         # --- SOLDIER LOGIC: Execute General's Strategy ---
         best_move = legal_moves[0]
