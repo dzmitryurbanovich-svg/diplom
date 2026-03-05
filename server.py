@@ -11,7 +11,7 @@ import copy
 import random
 
 from src.logic.engine import Board
-from src.logic.deck import DECK_DEFINITIONS
+from src.logic.deck import DECK_DEFINITIONS, create_deck
 from src.logic.telemetry import game_telemetry
 from src.logic.agents import GreedyAgent, StarAgent, MCTSAgent, HybridLLMAgent
 from src.logic.auth_manager import UserAuthManager
@@ -51,12 +51,12 @@ class GameSession:
         self.p1_type = p1_str
         self.p2_type = p2_str
         self.board = Board()
-        self.deck = copy.deepcopy(DECK_DEFINITIONS)
+        self.deck = create_deck()
         random.shuffle(self.deck)
         
         starter_idx = next(i for i, t in enumerate(self.deck) if t.name == "Tile_Starter")
         starter = self.deck.pop(starter_idx)
-        starter.name = "Tile_D"  # Map to actual asset name
+        starter.name = "Tile_D" # Map to actual asset name
         self.board.place_tile(0, 0, starter)
         
         # Scores and meeples are now managed by the board itself

@@ -69,11 +69,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, onMove }) => {
     // Compute grid bounds
     const bounds = useMemo(() => {
         let minX = -1, minY = -1, maxX = 1, maxY = 1;
-        if (state.grid.length > 0) {
-            minX = Math.min(...state.grid.map(t => t.x), ...state.legal_moves.map(m => m.x)) - 2;
-            minY = Math.min(...state.grid.map(t => t.y), ...state.legal_moves.map(m => m.y)) - 2;
-            maxX = Math.max(...state.grid.map(t => t.x), ...state.legal_moves.map(m => m.x)) + 2;
-            maxY = Math.max(...state.grid.map(t => t.y), ...state.legal_moves.map(m => m.y)) + 2;
+        const gridX = state.grid.map(t => t.x);
+        const gridY = state.grid.map(t => t.y);
+        const moveX = (state.legal_moves || []).map(m => m.x);
+        const moveY = (state.legal_moves || []).map(m => m.y);
+
+        const allX = [...gridX, ...moveX];
+        const allY = [...gridY, ...moveY];
+
+        if (allX.length > 0) {
+            minX = Math.min(...allX) - 2;
+            maxX = Math.max(...allX) + 2;
+        }
+        if (allY.length > 0) {
+            minY = Math.min(...allY) - 2;
+            maxY = Math.max(...allY) + 2;
         }
         return { minX, minY, maxX, maxY };
     }, [state.grid, state.legal_moves]);
@@ -259,7 +269,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, onMove }) => {
                                             {isSelected && (
                                                 <>
                                                     {/* Meeple Hotspots */}
-                                                    {state.meeples[state.current_player] > 0 && state.meeple_choices.map((choice) => {
+                                                    {state.meeples[state.current_player] > 0 && state.meeple_choices && state.meeple_choices.map((choice) => {
                                                         const pos = getMeeplePosition(choice.nodes, choice.type);
                                                         const isThisSelected = selectedMeepleIdx === choice.index;
                                                         return (
@@ -282,7 +292,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, onMove }) => {
                                                         <div
                                                             className="absolute z-40 transition-all duration-300 animate-meeple-pop pointer-events-none"
                                                             style={{
-                                                                ...getMeeplePosition(state.meeple_choices.find(c => c.index === selectedMeepleIdx)?.nodes || [], state.meeple_choices.find(c => c.index === selectedMeepleIdx)?.type),
+                                                                ...getMeeplePosition(state.meeple_choices?.find(c => c.index === selectedMeepleIdx)?.nodes || [], state.meeple_choices?.find(c => c.index === selectedMeepleIdx)?.type),
                                                                 width: TILE_SIZE * 0.3, height: TILE_SIZE * 0.3,
                                                                 marginLeft: -(TILE_SIZE * 0.15), marginTop: -(TILE_SIZE * 0.15)
                                                             }}

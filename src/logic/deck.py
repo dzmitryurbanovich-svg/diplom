@@ -42,7 +42,8 @@ def create_deck() -> list[Tile]:
         "Tile_A": 2, "Tile_B": 4, "Tile_C": 1, "Tile_D": 4, "Tile_E": 5, "Tile_F": 2,
         "Tile_G": 1, "Tile_H": 3, "Tile_I": 2, "Tile_J": 3, "Tile_K": 3, "Tile_L": 3,
         "Tile_M": 2, "Tile_N": 3, "Tile_O": 2, "Tile_P": 3, "Tile_Q": 1, "Tile_R": 3,
-        "Tile_S": 2, "Tile_T": 1, "Tile_U": 8, "Tile_V": 9, "Tile_W": 4, "Tile_X": 1
+        "Tile_S": 2, "Tile_T": 1, "Tile_U": 8, "Tile_V": 9, "Tile_W": 4, "Tile_X": 1,
+        "Tile_Starter": 1
     }
     deck = []
     for name, count in counts.items():
