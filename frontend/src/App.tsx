@@ -152,38 +152,58 @@ function App() {
   }
 
   return (
-    <div className="h-screen w-screen bg-slate-900 flex overflow-hidden text-slate-200">
-      <div className="flex-1 p-4 h-full relative">
+    <div className="h-screen w-screen bg-slate-900 grid grid-rows-[3fr_2fr] md:grid-rows-1 md:grid-cols-[1fr_320px] overflow-hidden text-slate-200">
+      {/* Game Board Area */}
+      <div className="relative min-h-0 min-w-0 overflow-hidden border-b md:border-b-0 md:border-r border-slate-700">
         {gameState && <GameBoard state={gameState} onMove={handleUserMove} />}
       </div>
 
-      <div className="w-80 bg-slate-800 border-l border-slate-700 p-4 flex flex-col h-full shrink-0">
-        <h2 className="text-xl font-bold mb-4 font-mono text-blue-400 shrink-0">TELEMETRY</h2>
+      {/* Telemetry Sidebar */}
+      <div className="bg-slate-800 p-4 flex flex-col min-h-0 min-w-0 shadow-2xl z-10 overflow-hidden">
+        <div className="flex justify-between items-center mb-4 shrink-0">
+          <h2 className="text-lg font-bold font-mono text-blue-400">TELEMETRY</h2>
+          {gameState && <span className="text-[10px] text-slate-500 uppercase">Room: {session?.slice(0, 8)}</span>}
+        </div>
 
         {gameState && (
-          <div className="space-y-4 text-sm bg-slate-900 rounded p-4 border border-slate-700 shrink-0">
-            <div className="flex justify-between">
-              <span className="text-red-400 font-bold">Player 1: {gameState.scores['Player1']}</span>
-              <span>🛠️ {gameState.meeples['Player1']}</span>
+          <div className="grid grid-cols-2 md:grid-cols-1 gap-2 text-xs bg-slate-900/50 rounded-lg p-3 border border-slate-700/50 mb-4 shrink-0 shadow-inner">
+            <div className="flex flex-col bg-red-500/10 p-2 rounded border border-red-500/20">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-red-400 font-bold">P1: {gameState.scores['Player1']}</span>
+                <span className="text-[10px]">🛠️ {gameState.meeples['Player1']}</span>
+              </div>
+              <span className="text-[9px] text-red-300/60 uppercase font-mono tracking-tighter">{gameState.player_types['Player1']}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-blue-400 font-bold">Player 2: {gameState.scores['Player2']}</span>
-              <span>🛠️ {gameState.meeples['Player2']}</span>
+            <div className="flex flex-col bg-blue-500/10 p-2 rounded border border-blue-500/20">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-blue-400 font-bold">P2: {gameState.scores['Player2']}</span>
+                <span className="text-[10px]">🛠️ {gameState.meeples['Player2']}</span>
+              </div>
+              <span className="text-[9px] text-blue-300/60 uppercase font-mono tracking-tighter">{gameState.player_types['Player2']}</span>
             </div>
-            <div className="pt-2 border-t border-slate-700 text-slate-400 text-xs">
-              Deck Remainder: {gameState.deck_remaining}
+            <div className="col-span-2 md:col-span-1 pt-1 text-center md:text-left text-slate-500 text-[10px]">
+              DECK: {gameState.deck_remaining} LEFT
             </div>
           </div>
         )}
 
-        <h3 className="font-bold text-slate-400 mt-6 mb-2 shrink-0">Logs ({gameState?.logs.length})</h3>
-        <div className="flex-1 space-y-2 font-mono text-[10px] overflow-y-auto w-full break-words bg-black/40 p-2 rounded custom-scrollbar">
-          {gameState?.logs.map((L, i) => (
-            <div key={i} className="py-1 border-b border-white/5 opacity-80">{L}</div>
-          ))}
+        <h3 className="font-bold text-slate-500 text-[10px] uppercase tracking-widest mb-2 shrink-0">Game Logs</h3>
+        <div className="flex-1 min-h-0 font-mono text-[9px] overflow-y-auto w-full break-words bg-black/30 backdrop-blur-sm p-2 rounded border border-white/5 custom-scrollbar flex flex-col-reverse">
+          <div className="flex flex-col">
+            {gameState?.logs.map((L, i) => (
+              <div key={i} className="py-1 border-b border-white/5 opacity-70 hover:opacity-100 transition-opacity">
+                <span className="text-slate-600 mr-2">{i + 1}.</span>
+                {L}
+              </div>
+            ))}
+            {(!gameState?.logs || gameState.logs.length === 0) && <div className="text-slate-600 italic">No logs yet...</div>}
+          </div>
         </div>
 
-        <button onClick={() => setSession(null)} className="mt-4 p-2 bg-red-600 hover:bg-red-500 w-full rounded text-sm font-bold transition shrink-0">
+        <button
+          onClick={() => { if (window.confirm("Abandon this match?")) setSession(null); }}
+          className="mt-4 p-2 bg-red-600/80 hover:bg-red-500 text-white w-full rounded text-xs font-bold transition-all shadow-lg active:scale-95 shrink-0"
+        >
           Abandon Match
         </button>
       </div>

@@ -42,12 +42,15 @@ async def debug_list_files():
 
 class GameSession:
     def __init__(self, p1_str="Human", p2_str="Star2.5"):
+        self.p1_type = p1_str
+        self.p2_type = p2_str
         self.board = Board()
         self.deck = copy.deepcopy(DECK_DEFINITIONS)
         random.shuffle(self.deck)
         
         starter_idx = next(i for i, t in enumerate(self.deck) if t.name == "Tile_Starter")
         starter = self.deck.pop(starter_idx)
+        starter.name = "Tile_D"  # Map to actual asset name
         self.board.place_tile(0, 0, starter)
         
         # Scores and meeples are now managed by the board itself
@@ -104,12 +107,17 @@ class GameSession:
         log_msg = f"[{self.current_player}] Placed {self.pending_tile.name} at ({x}, {y}) with rot {rotation}."
 
         if meeple_target != "None":
-            if any(k in meeple_target for k in ["CITY", "ROAD", "FIELD", "MONASTERY"]):
-                try:
+            try:
+                # Handle both "CITY - 0" and plain "0"
+                if "-" in meeple_target:
                     idx = int(meeple_target.split('-')[-1].strip())
-                    if self.board.place_meeple(x, y, idx, self.current_player):
-                        log_msg += f" Placed MEEPLE."
-                except: pass
+                else:
+                    idx = int(meeple_target)
+                
+                if self.board.place_meeple(x, y, idx, self.current_player):
+                    log_msg += f" Placed MEEPLE."
+            except (ValueError, IndexError):
+                pass
 
         self.logs.append(log_msg)
         self.board.get_completed_features()
@@ -162,17 +170,18 @@ def get_state(session_id: str):
         grid_data.append({"x": x, "y": y, "name": t.name, "rotation": t.rotation, "meeples": meeple_data})
     
     moves = [{"x": x, "y": y, "r": r} for (x, y, r) in gs.pending_legal_moves]
-    meeple_choices = ["None"]
     tile_name = None
+    meeple_choices = []
     if gs.pending_tile:
         tile_name = gs.pending_tile.name
-        meeple_choices += [f"{s.type.name} - {i}" for i, s in enumerate(gs.pending_tile.segments)]
+        meeple_choices = [{"index": i, "type": s.type.name, "sides": [side.name for side in s.sides]} for i, s in enumerate(gs.pending_tile.segments)]
 
     return {
         "game_over": gs.game_over, "current_player": gs.current_player, "is_human_turn": gs.agents[gs.current_player] is None,
-        "scores": gs.scores, "meeples": gs.meeples, "logs": gs.logs[-10:], "deck_remaining": len(gs.deck),
+        "scores": gs.scores, "meeples": gs.meeples, "logs": gs.logs, "deck_remaining": len(gs.deck),
         "grid": grid_data, "pending_tile": tile_name, "legal_moves": moves, "meeple_choices": meeple_choices,
-        "last_played": {"x": gs.last_played[0], "y": gs.last_played[1]}
+        "last_played": {"x": gs.last_played[0], "y": gs.last_played[1]},
+        "player_types": {"Player1": gs.p1_type, "Player2": gs.p2_type}
     }
 
 @app.post("/api/game/{session_id}/move")
@@ -197,18 +206,31 @@ async def ai_step_endpoint(session_id: str):
     def sync_ai(): return agent.select_move(gs.board, gs.pending_tile, gs.pending_legal_moves, gs.meeples[gs.current_player] > 0)
     
     try:
-        best_move, meeple_idx, ai_logs = await asyncer.asyncify(sync_ai)()
-    except Exception as e:
-        gs.logs.append(f"❌ AI Error: {str(e)}")
-        best_move = random.choice(gs.pending_legal_moves)
-        meeple_idx = -1
+        # Agents return (x, y, rot, meeple_idx) or they used to return (best_move, meeple_idx, logs)
+        # Looking at src/logic/agents.py, most return x, y, rot, meeple_idx.
+        # HybridLLMAgent returns x, y, rot, meeple_idx.
+        # But StarAgent and others also return 4 values.
+        result = await asyncer.asyncify(sync_ai)()
+        if len(result) == 4:
+            mx, my, mrot, midx = result
+        else:
+            # Fallback for old 3-tuple format if any
+            move, midx, _ = result
+            mx, my, mrot = move
         
-    if best_move:
-        mx, my, mrot = best_move
-        meeple_str = f"AUTO - {meeple_idx}" if meeple_idx != -1 else "None"
+        meeple_str = str(midx) if midx is not None else "None"
         success, msg = gs.execute_move((mx, my), mrot, meeple_str)
         if success: gs.prepare_turn()
         return {"success": success, "message": msg}
+    except Exception as e:
+        gs.logs.append(f"❌ AI Error: {str(e)}")
+        # Fallback move
+        if gs.pending_legal_moves:
+            mx, my, mrot = random.choice(gs.pending_legal_moves)
+            success, msg = gs.execute_move((mx, my), mrot, "None")
+            if success: gs.prepare_turn()
+            return {"success": success, "message": f"AI Error Fallback: {msg}"}
+        return {"success": False, "message": f"AI Error: {str(e)}"}
     return {"success": False, "message": "AI failed to find a move."}
 
 # --- Production Static File Serving (Unified SPA Handler) ---

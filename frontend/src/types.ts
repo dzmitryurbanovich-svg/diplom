@@ -17,6 +17,12 @@ export interface LegalMove {
     r: number;
 }
 
+export interface MeepleChoice {
+    index: number;
+    type: string;
+    sides: string[];
+}
+
 export interface GameState {
     game_over: boolean;
     current_player: string;
@@ -28,6 +34,7 @@ export interface GameState {
     grid: TileData[];
     pending_tile: string | null;
     legal_moves: LegalMove[];
-    meeple_choices: string[];
+    meeple_choices: MeepleChoice[];
     last_played: { x: number; y: number };
+    player_types: Record<string, string>;
 }
