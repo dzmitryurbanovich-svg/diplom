@@ -129,12 +129,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, onMove }) => {
             <div className="bg-slate-800 p-3 border-b border-slate-700 flex flex-wrap justify-between items-center text-white gap-2 shrink-0 z-50">
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
-                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Turn</div>
-                        <div className={`px-2 py-0.5 rounded text-xs font-bold ${state.current_player === 'Player1' ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'bg-blue-500 text-white shadow-[0_0_10px_rgba(59,130,246,0.3)]'}`}>
-                            {state.current_player}
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                            {state.game_over ? 'Winner' : 'Turn'}
                         </div>
+                        {state.game_over ? (
+                            <div className="px-3 py-1 bg-emerald-500 text-white rounded-full text-xs font-black shadow-lg animate-bounce">
+                                {state.scores['Player1'] > state.scores['Player2'] ? 'PLAYER 1 (RED)' :
+                                    state.scores['Player2'] > state.scores['Player1'] ? 'PLAYER 2 (BLUE)' : 'DRAW!'}
+                            </div>
+                        ) : (
+                            <div className={`px-2 py-0.5 rounded text-xs font-bold ${state.current_player === 'Player1' ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'bg-blue-500 text-white shadow-[0_0_10px_rgba(59,130,246,0.3)]'}`}>
+                                {state.current_player}
+                            </div>
+                        )}
                     </div>
-                    {state.is_human_turn && <div className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20 animate-pulse"><UserCheck size={12} /> YOUR TURN</div>}
+                    {!state.game_over && state.is_human_turn && <div className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20 animate-pulse"><UserCheck size={12} /> YOUR TURN</div>}
                 </div>
 
                 {state.is_human_turn && state.pending_tile && (

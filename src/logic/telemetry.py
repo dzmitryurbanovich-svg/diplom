@@ -8,8 +8,15 @@ class TelemetryManager:
     Handles logging of game events, agent decisions, and outcomes 
     to create a dataset for future fine-tuning and learning.
     """
-    def __init__(self, log_dir: str = "logs/telemetry"):
-        self.log_dir = log_dir
+    def __init__(self, log_dir: str = None):
+        if log_dir is None:
+            # Use project root/logs/telemetry
+            base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            self.log_dir = os.path.join(base_path, "logs", "telemetry")
+        else:
+            self.log_dir = log_dir
+            
+        print(f"[TELEMETRY] Initializing in: {self.log_dir}")
         os.makedirs(self.log_dir, exist_ok=True)
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.game_log_path = os.path.join(self.log_dir, f"game_{self.session_id}.jsonl")
@@ -41,8 +48,10 @@ class TelemetryManager:
         }
         
         summary_path = os.path.join(self.log_dir, "summary_stats.jsonl")
+        print(f"[TELEMETRY] Finalizing game. Writing to: {summary_path}")
         with open(summary_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(summary, ensure_ascii=False) + "\n")
+        print(f"[TELEMETRY] Done writing summary. Total turns logged: {summary['total_turns']}")
             
     def list_logs(self) -> List[str]:
         """Returns a list of all telemetry log files."""

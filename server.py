@@ -86,8 +86,15 @@ class GameSession:
             self.game_over = True
             self.board.calculate_final_scores()
             self.logs.append("🏁 **Game Over! Final scores calculated.**")
-            return
             
+        if self.game_over:
+            s1 = self.board.scores.get("Player1", 0)
+            s2 = self.board.scores.get("Player2", 0)
+            winner = "Player1" if s1 > s2 else "Player2" if s2 > s1 else "Draw"
+            print(f"[DEBUG] Finalizing game: s1={s1}, s2={s2}, winner={winner}")
+            game_telemetry.finalize_game(self.board.scores, winner)
+            return
+
         self.pending_tile = self.deck.pop(0)
         self.pending_legal_moves = self.board.get_legal_moves(self.pending_tile)
         
@@ -95,10 +102,18 @@ class GameSession:
             self.logs.append(f"⚠️ Tile {self.pending_tile.name} has no valid moves. Discarding.")
             self.pending_tile = self.deck.pop(0)
             self.pending_legal_moves = self.board.get_legal_moves(self.pending_tile)
-            
+
         if not self.pending_legal_moves:
             self.game_over = True
+            self.board.calculate_final_scores()
             self.logs.append("🏁 No legal moves left! Game Over.")
+
+        if self.game_over:
+            s1 = self.board.scores.get("Player1", 0)
+            s2 = self.board.scores.get("Player2", 0)
+            winner = "Player1" if s1 > s2 else "Player2" if s2 > s1 else "Draw"
+            print(f"[DEBUG] Finalizing game: s1={s1}, s2={s2}, winner={winner}")
+            game_telemetry.finalize_game(self.board.scores, winner)
 
     def execute_move(self, move_coords, rotation, meeple_target, strategy=None, rationale=None):
         x, y = move_coords

@@ -165,8 +165,11 @@ function App() {
     refreshState(session);
   };
 
-  const handleAbandon = () => {
-    if (window.confirm("Abandon this match?")) { setSession(null); setGameState(null); }
+  const handleEndSession = () => {
+    if (gameState?.game_over || window.confirm("Abandon this match?")) {
+      setSession(null);
+      setGameState(null);
+    }
   };
 
   // ─── AI Game Loop — deduplicated, 100ms delay ──────────────────────────────
@@ -304,10 +307,10 @@ function App() {
         </div>
 
         <button
-          onClick={handleAbandon}
-          className="mt-4 p-2 bg-red-600/80 hover:bg-red-500 text-white w-full rounded text-xs font-bold transition-all shadow-lg active:scale-95 shrink-0"
+          onClick={handleEndSession}
+          className={`mt-4 p-2 w-full rounded text-xs font-bold transition-all shadow-lg active:scale-95 shrink-0 ${gameState?.game_over ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-red-600/80 hover:bg-red-500 text-white'}`}
         >
-          Abandon Match
+          {gameState?.game_over ? 'New Game / Setup' : 'Abandon Match'}
         </button>
       </div>
     </div>
