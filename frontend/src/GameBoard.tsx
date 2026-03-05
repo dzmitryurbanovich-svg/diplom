@@ -125,14 +125,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, onMove }) => {
                 </div>
 
                 {state.is_human_turn && state.pending_tile && (
-                    <div className="flex items-center gap-3 bg-slate-700/50 px-3 py-1.5 rounded-lg border border-slate-600/50 animate-fade-in-up">
+                    <div className="flex items-center gap-4 bg-slate-700/50 px-4 py-2 rounded-xl border border-white/20 animate-fade-in-up">
                         <div className="relative group">
                             <img
                                 src={`/assets/tiles/Base_Game_C3_Tile_${state.pending_tile.replace('Tile_', '')}.png`}
-                                className="w-10 h-10 shadow-lg rounded-sm border border-white/10"
+                                className="w-20 h-20 shadow-2xl rounded-md border-2 border-white/20"
                                 style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
                             />
-                            <div className="absolute -bottom-1 -right-1 bg-slate-900 text-[8px] px-1 rounded border border-white/20">NEXT</div>
+                            <div className="absolute -bottom-2 -right-2 bg-slate-900 text-[10px] px-2 py-0.5 rounded-full border border-blue-500 font-bold text-blue-400">NEXT</div>
                         </div>
 
                         <button
@@ -219,7 +219,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, onMove }) => {
                                             }}
                                         >
                                             <img
-                                                src={`/assets/meeples/${m.player === 'Player1' ? 'red' : 'blue'}_meeple.${m.player === 'Player1' ? 'png' : 'jpg'}`}
+                                                src={`/assets/meeples/${m.player === 'Player1' ? 'red' : 'blue'}_meeple.png`}
                                                 className="w-full h-full drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]"
                                             />
                                         </div>
@@ -285,7 +285,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, onMove }) => {
                                                             }}
                                                         >
                                                             <img
-                                                                src={`/assets/meeples/${state.current_player === 'Player1' ? 'red' : 'blue'}_meeple.${state.current_player === 'Player1' ? 'png' : 'jpg'}`}
+                                                                src={`/assets/meeples/${state.current_player === 'Player1' ? 'red' : 'blue'}_meeple.png`}
                                                                 className="w-full h-full opacity-60 drop-shadow-xl"
                                                             />
                                                         </div>
