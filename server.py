@@ -14,6 +14,11 @@ from src.logic.engine import Board
 from src.logic.deck import DECK_DEFINITIONS
 from src.logic.agents import GreedyAgent, StarAgent, MCTSAgent, HybridLLMAgent
 from src.logic.auth_manager import UserAuthManager
+import json
+import time
+
+LOG_DIR = "game_logs"
+os.makedirs(LOG_DIR, exist_ok=True)
 
 app = FastAPI()
 
@@ -121,11 +126,30 @@ class GameSession:
 
         self.logs.append(log_msg)
         self.board.get_completed_features()
+        
+        # Log this move for training data
+        self.log_to_file({
+            "player": self.current_player,
+            "player_type": self.p1_type if self.current_player == "Player1" else self.p2_type,
+            "move": {"x": x, "y": y, "rotation": rotation, "meeple": meeple_target},
+            "timestamp": time.time(),
+            "scores": copy.deepcopy(self.board.scores),
+            "deck_remaining": len(self.deck)
+        })
 
         self.current_player = "Player2" if self.current_player == "Player1" else "Player1"
         self.pending_tile = None
         self.pending_legal_moves = []
         return True, ""
+
+    def log_to_file(self, data):
+        """Appends turn data to a JSONL file for the current session."""
+        try:
+            log_path = os.path.join(LOG_DIR, f"session_{self.hf_token if self.hf_token else 'dev'}_{id(self)}.jsonl")
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(data) + "\n")
+        except Exception:
+            pass
 
 sessions: Dict[str, GameSession] = {}
 

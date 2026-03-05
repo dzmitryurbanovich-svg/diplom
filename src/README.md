@@ -1,29 +1,23 @@
-# Source Code (Logic)
+# 🧠 Source Logic — `src/`
 
-Эта папка содержит реализацию программной логики игры Каркассон и интеллектуальных агентов.
+Core Python modules powering the game engine and AI agents.
 
-## Архитектура
+## `logic/`
 
-### 1. Logic Layer (`src/logic/`)
-Чистая реализация правил игры.
-- `models.py`: Классы `Tile`, `Side`, `Segment`. Тайлы представлены как графы со связями между сторонами.
-- `engine.py`: Основной класс `Board`, управляющий состоянием игры, подсчетом очков и проверкой легальности ходов. Использует алгоритм **DSU (Disjoint Set Union)** для оптимизированного поиска связных объектов (дорог, городов).
-- `deck.py`: Описание стандартного набора из 72 тайлов.
+| File | Description |
+|---|---|
+| `engine.py` | `Board` class — DSU-based territory management, legal move generation, scoring |
+| `agents.py` | AI agents: `GreedyAgent`, `StarAgent`, `MCTSAgent`, `HybridLLMAgent` |
+| `deck.py` | Full C3-edition tile deck with segment definitions |
+| `models.py` | `Tile`, `TileSegment`, `Side`, `SegmentType` data classes |
+| `auth_manager.py` | Simple in-memory user authentication |
+| `telemetry.py` | Utility for structured game event tracking |
 
-### 2. Integration Layer (`src/mcp/`)
-Реализация протокола **Model Context Protocol (MCP)**.
-- `server.py`: Сервер, который предоставляет инструменты (`Tools`) для внешних ИИ-агентов.
-- `prompts.py`: Библиотека промптов для реализации сложных стратегий (Tree of Thoughts, Reflexion).
+## `mcp/`
 
-### 3. AI Agents (`src/logic/agents.py`)
-Реализация алгоритмов принятия решений:
-- `GreedyAgent`: Простой жадный алгоритм.
-- `StarAgent`: Эвристический поиск.
-- `MCTSAgent`: Поиск по дереву Монте-Карло.
-- `HybridLLMAgent`: Гибридный подход, использующий внешние LLM.
+Experimental [Model Context Protocol](https://modelcontextprotocol.io/) server — exposes game state as an MCP resource so LLMs can query it directly.
 
-## Технологии
-- Python 3.12+
-- DSU (Система непересекающихся множеств)
-- Hugging Face Inference API
-- PIL (Pillow) для рендеринга
+| File | Description |
+|---|---|
+| `server.py` | MCP server exposing board state and legal moves |
+| `prompts.py` | Prompt templates for LLM agents |

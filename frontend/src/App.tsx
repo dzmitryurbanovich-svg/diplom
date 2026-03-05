@@ -3,7 +3,7 @@ import { GameBoard } from './GameBoard';
 import { authLogin, authRegister, startNewGame, fetchGameState, applyMove, triggerAiStep } from './api';
 import type { GameState } from './types';
 import { PlayCircle, LogIn, LayoutDashboard } from 'lucide-react';
-import heroBg from './assets/hero_bg.png';
+import heroBg from './assets/hero_bg.jpg';
 
 function App() {
   const [email, setEmail] = useState('');
@@ -71,9 +71,9 @@ function App() {
 
   if (!isLogged) {
     return (
-      <div className="h-screen w-full bg-slate-900 flex flex-col lg:flex-row overflow-hidden">
+      <div className="min-h-screen w-full flex flex-row overflow-hidden bg-slate-900" style={{ backgroundColor: '#0f172a' }}>
         {/* Left Side: Auth Form */}
-        <div className="w-full lg:w-[480px] h-full flex items-center justify-center p-8 z-20 bg-slate-900 shadow-[20px_0_60px_rgba(0,0,0,0.5)]">
+        <div className="flex-shrink-0 w-full lg:w-[480px] min-h-screen flex items-center justify-center p-8 z-20 bg-slate-900 shadow-[20px_0_60px_rgba(0,0,0,0.5)]">
           <div className="w-full max-w-sm bg-slate-800/80 p-8 rounded-3xl shadow-2xl border border-slate-700/50 animate-fade-in-up">
             <div className="flex justify-center mb-6 text-blue-500">
               <div className="bg-blue-500/10 p-4 rounded-2xl border border-blue-500/20 shadow-inner">
@@ -120,10 +120,12 @@ function App() {
         </div>
 
         {/* Right Side: Hero Section */}
-        <div
-          className="hidden lg:block flex-1 h-full relative bg-slate-950 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${heroBg})` }}
-        >
+        <div className="hidden lg:block relative flex-grow min-h-screen bg-slate-950">
+          <img
+            src={heroBg}
+            alt="Castle Hero"
+            className="absolute inset-0 w-full h-full object-cover opacity-80"
+          />
           {/* Overlay Gradient for smooth blending */}
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent z-10" />
 
@@ -140,9 +142,9 @@ function App() {
 
   if (!session) {
     return (
-      <div className="h-screen w-full bg-slate-900 flex flex-col lg:flex-row overflow-hidden">
+      <div className="min-h-screen w-full flex flex-row overflow-hidden bg-slate-900" style={{ backgroundColor: '#0f172a' }}>
         {/* Left Side: Match Setup */}
-        <div className="w-full lg:w-[480px] h-full flex items-center justify-center p-8 z-20 bg-slate-900 shadow-[20px_0_50px_rgba(0,0,0,0.4)]">
+        <div className="flex-shrink-0 w-full lg:w-[480px] min-h-screen flex items-center justify-center p-8 z-20 bg-slate-900 shadow-[20px_0_50px_rgba(0,0,0,0.4)]">
           <div className="w-full max-w-sm animate-fade-in-up">
             <h1 className="text-3xl font-black flex items-center gap-4 mb-2 text-white tracking-tight">
               <div className="bg-emerald-500 p-2 rounded-xl shadow-lg shadow-emerald-500/20"><LayoutDashboard size={32} /></div>
@@ -181,10 +183,12 @@ function App() {
         </div>
 
         {/* Right Side: Hero Section */}
-        <div
-          className="hidden lg:block flex-1 h-full relative bg-slate-950 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${heroBg})` }}
-        >
+        <div className="hidden lg:block relative flex-grow min-h-screen bg-slate-950">
+          <img
+            src={heroBg}
+            alt="Castle Hero"
+            className="absolute inset-0 w-full h-full object-cover opacity-80"
+          />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent z-10" />
           <div className="absolute top-16 right-16 z-20">
             <div className="bg-black/60 backdrop-blur-md px-6 py-4 rounded-3xl border border-white/10 text-white/60 text-[10px] font-black tracking-widest shadow-2xl">

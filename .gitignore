@@ -3,8 +3,21 @@ venv/
 .venv/
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
 
-# LaTeX
+# Logs and training data (generated at runtime)
+game_logs/
+logs/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# LaTeX build artifacts
 thesis/*.aux
 thesis/*.log
 thesis/*.out
@@ -14,17 +27,16 @@ thesis/*.blg
 thesis/*.fdb_latexmk
 thesis/*.fls
 thesis/*.synctex.gz
-
-# IDE
-.vscode/
-.idea/
-.DS_Store
-
-# Temporary
-extracted_images/
-*.pdf_images
 texput.log
 
-# Build artifacts
+# Frontend build artifacts (committed deliberately for HF deploy)
+# frontend/dist/
+
+# Node.js
+frontend/node_modules/
+
+# Temp build packages
 deployment_package/
 deployment_package.zip
+extracted_images/
+*.pdf_images
