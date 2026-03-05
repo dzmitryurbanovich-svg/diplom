@@ -3,6 +3,7 @@ import { GameBoard } from './GameBoard';
 import { authLogin, authRegister, startNewGame, fetchGameState, applyMove, triggerAiStep } from './api';
 import type { GameState } from './types';
 import { PlayCircle, LogIn, LayoutDashboard } from 'lucide-react';
+import heroBg from './assets/hero_bg.png';
 
 function App() {
   const [email, setEmail] = useState('');
@@ -70,44 +71,67 @@ function App() {
 
   if (!isLogged) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-700">
-          <div className="flex justify-center mb-6 text-blue-500"><LogIn size={48} /></div>
-          <h1 className="text-2xl font-bold text-center text-white mb-2">Carcassonne AI</h1>
-          <p className="text-slate-400 text-center mb-6">
-            {authMode === 'login' ? 'Sign in to start the tournament' : 'Create an account to join'}
-          </p>
-          <form onSubmit={handleAuth} className="space-y-4">
-            <input
-              type="text" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
-              className="w-full bg-slate-700 text-white p-3 rounded-xl border border-slate-600 outline-none focus:border-blue-500"
-            />
-            <input
-              type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}
-              className="w-full bg-slate-700 text-white p-3 rounded-xl border border-slate-600 outline-none focus:border-blue-500"
-            />
-            <button className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-bold transition">
-              {authMode === 'login' ? 'Login' : 'Register'}
-            </button>
-          </form>
-
-          <div className="mt-6 flex flex-col gap-3">
-            <button
-              onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
-              className="text-slate-400 hover:text-white text-sm transition text-center"
-            >
-              {authMode === 'login' ? "Don't have an account? Register" : "Already have an account? Login"}
-            </button>
-            <div className="relative py-2">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-700"></div></div>
-              <div className="relative flex justify-center text-xs uppercase"><span className="bg-slate-800 px-2 text-slate-500">Or</span></div>
+      <div className="h-screen w-full bg-slate-900 flex flex-col lg:flex-row overflow-hidden">
+        {/* Left Side: Auth Form */}
+        <div className="w-full lg:w-[480px] h-full flex items-center justify-center p-8 z-20 bg-slate-900 shadow-[20px_0_60px_rgba(0,0,0,0.5)]">
+          <div className="w-full max-w-sm bg-slate-800/80 p-8 rounded-3xl shadow-2xl border border-slate-700/50 animate-fade-in-up">
+            <div className="flex justify-center mb-6 text-blue-500">
+              <div className="bg-blue-500/10 p-4 rounded-2xl border border-blue-500/20 shadow-inner">
+                <LogIn size={40} />
+              </div>
             </div>
-            <button
-              onClick={handleGuest}
-              className="w-full border border-slate-600 hover:bg-slate-700 text-slate-300 py-2 rounded-xl text-sm transition"
-            >
-              Enter as Guest (Demo)
-            </button>
+            <h1 className="text-3xl font-black text-center text-white mb-2 tracking-tight">Carcassonne AI</h1>
+            <p className="text-slate-400 text-center mb-8 font-medium">
+              {authMode === 'login' ? 'Sign in to start the tournament' : 'Join the elite AI strategist club'}
+            </p>
+            <form onSubmit={handleAuth} className="space-y-4">
+              <input
+                type="text" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
+                className="w-full bg-slate-900/50 text-white p-4 rounded-xl border border-slate-700 outline-none focus:border-blue-500 transition-all font-medium"
+              />
+              <input
+                type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}
+                className="w-full bg-slate-900/50 text-white p-4 rounded-xl border border-slate-700 outline-none focus:border-blue-500 transition-all font-medium"
+              />
+              <button className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl font-black text-lg transition-all transform active:scale-95 shadow-lg shadow-blue-500/25">
+                {authMode === 'login' ? 'Login' : 'Register'}
+              </button>
+            </form>
+
+            <div className="mt-8 flex flex-col gap-4">
+              <button
+                onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+                className="text-slate-400 hover:text-white text-xs font-bold text-center underline underline-offset-4"
+              >
+                {authMode === 'login' ? "Don't have an account? Register" : "Already have an account? Login"}
+              </button>
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-700/50"></div></div>
+                <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest"><span className="bg-slate-800 px-3 text-slate-500">Or</span></div>
+              </div>
+              <button
+                onClick={handleGuest}
+                className="w-full border border-slate-700 hover:bg-slate-700/50 text-slate-300 py-3 rounded-xl text-sm font-bold transition-all"
+              >
+                Enter as Guest
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side: Hero Section */}
+        <div
+          className="hidden lg:block flex-1 h-full relative bg-slate-950 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${heroBg})` }}
+        >
+          {/* Overlay Gradient for smooth blending */}
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent z-10" />
+
+          <div className="absolute bottom-16 left-16 z-20 text-white max-w-md drop-shadow-2xl">
+            <h2 className="text-4xl font-black mb-4 leading-tight">Master the Medieval Strategy.</h2>
+            <p className="text-slate-200 font-medium leading-relaxed bg-black/20 backdrop-blur-sm p-4 rounded-2xl border border-white/10">
+              Experience the classic Carcassonne enhanced by high-level AI algorithms. Build, compete, and evolve.
+            </p>
           </div>
         </div>
       </div>
@@ -116,24 +140,31 @@ function App() {
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-slate-900 p-8">
-        <div className="max-w-4xl mx-auto bg-slate-800 p-8 rounded-2xl border border-slate-700 text-white">
-          <h1 className="text-3xl font-bold flex items-center gap-3 mb-6"><LayoutDashboard /> Scenario Selection</h1>
-          <div className="grid grid-cols-2 gap-8 mb-8">
-            <div className="bg-slate-700 p-6 rounded-xl">
-              <label className="block text-slate-300 text-sm mb-2">Player 1 (Red)</label>
-              <select value={p1} onChange={e => setP1(e.target.value)} className="w-full bg-slate-800 p-3 rounded border border-slate-600">
-                <option>Human</option>
-                <option>Greedy</option>
-                <option>Star2.5</option>
-                <option>MCTS</option>
-                <option>Hybrid LLM</option>
-              </select>
-            </div>
-            <div className="grid grid-cols-1 gap-4">
-              <div className="bg-slate-700 p-6 rounded-xl">
-                <label className="block text-slate-300 text-sm mb-2">Player 2 (Blue)</label>
-                <select value={p2} onChange={e => setP2(e.target.value)} className="w-full bg-slate-800 p-3 rounded border border-slate-600">
+      <div className="h-screen w-full bg-slate-900 flex flex-col lg:flex-row overflow-hidden">
+        {/* Left Side: Match Setup */}
+        <div className="w-full lg:w-[480px] h-full flex items-center justify-center p-8 z-20 bg-slate-900 shadow-[20px_0_50px_rgba(0,0,0,0.4)]">
+          <div className="w-full max-w-sm animate-fade-in-up">
+            <h1 className="text-3xl font-black flex items-center gap-4 mb-2 text-white tracking-tight">
+              <div className="bg-emerald-500 p-2 rounded-xl shadow-lg shadow-emerald-500/20"><LayoutDashboard size={32} /></div>
+              Setup Match
+            </h1>
+            <p className="text-slate-400 mb-8 font-medium text-sm">Select your participants for this tournament session.</p>
+
+            <div className="space-y-6 mb-8">
+              <div className="bg-slate-800/80 p-5 rounded-2xl border border-slate-700/50">
+                <label className="block text-red-400 text-[10px] font-black uppercase tracking-[0.2em] mb-3">Player 1 (Red)</label>
+                <select value={p1} onChange={e => setP1(e.target.value)} className="w-full bg-slate-900 text-white p-4 rounded-xl border border-slate-700 outline-none focus:ring-2 focus:ring-red-500 transition-all font-bold">
+                  <option>Human</option>
+                  <option>Greedy</option>
+                  <option>Star2.5</option>
+                  <option>MCTS</option>
+                  <option>Hybrid LLM</option>
+                </select>
+              </div>
+
+              <div className="bg-slate-800/80 p-5 rounded-2xl border border-slate-700/50">
+                <label className="block text-blue-400 text-[10px] font-black uppercase tracking-[0.2em] mb-3">Player 2 (Blue)</label>
+                <select value={p2} onChange={e => setP2(e.target.value)} className="w-full bg-slate-900 text-white p-4 rounded-xl border border-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold">
                   <option>Human</option>
                   <option>Greedy</option>
                   <option>Star2.5</option>
@@ -142,10 +173,24 @@ function App() {
                 </select>
               </div>
             </div>
+
+            <button onClick={handleStart} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-5 rounded-2xl font-black text-xl flex items-center justify-center gap-3 transition-all transform active:scale-95 shadow-xl shadow-emerald-500/30">
+              <PlayCircle size={28} /> Start Game
+            </button>
           </div>
-          <button onClick={handleStart} className="w-full bg-emerald-600 hover:bg-emerald-500 py-4 rounded-xl font-bold text-xl flex items-center justify-center gap-2 transition">
-            <PlayCircle /> Launch Match
-          </button>
+        </div>
+
+        {/* Right Side: Hero Section */}
+        <div
+          className="hidden lg:block flex-1 h-full relative bg-slate-950 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${heroBg})` }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent z-10" />
+          <div className="absolute top-16 right-16 z-20">
+            <div className="bg-black/60 backdrop-blur-md px-6 py-4 rounded-3xl border border-white/10 text-white/60 text-[10px] font-black tracking-widest shadow-2xl">
+              C3 EDITION • HIGH-FIDELITY AI TOURNAMENT
+            </div>
+          </div>
         </div>
       </div>
     );
