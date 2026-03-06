@@ -110,41 +110,33 @@ function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [p1, setP1] = useState('Human');
   const [p2, setP2] = useState('Star2.5');
-  const [isMuted, setIsMuted] = useState(true); // Default muted due to browser policy
+  const [isMusicMuted, setIsMusicMuted] = useState(true); // Music for game screen
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const audioRef = React.useRef<HTMLAudioElement>(null);
 
-  const toggleAudio = () => {
-    const nextMuted = !isMuted;
-    setIsMuted(nextMuted);
-
-    if (audioRef.current) {
-      if (nextMuted) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.volume = 0.7;
-        audioRef.current.play().catch(e => console.warn("Audio play blocked:", e));
-      }
-    }
-    if (videoRef.current) {
-      videoRef.current.muted = nextMuted;
-      videoRef.current.play().catch(() => { });
-    }
-  };
-
-  // Re-sync on session change (auto-play if already unmuted)
+  // Switch audio sources when transitioning between screens
   useEffect(() => {
-    if (!isMuted && audioRef.current) {
-      audioRef.current.volume = 0.7;
-      audioRef.current.play().catch(() => { });
-    }
-    if (videoRef.current) {
-      videoRef.current.muted = isMuted;
-      videoRef.current.play().catch(() => { });
+    const v = videoRef.current;
+    const a = audioRef.current;
+    if (session) {
+      // Game screen: stop video audio, play generated music (if music is on)
+      if (v) { v.muted = true; }
+      if (a && !isMusicMuted) {
+        a.volume = 0.7;
+        a.play().catch(() => { });
+      }
+    } else {
+      // Setup screen: play video with its own audio, pause generated music
+      if (a) { a.pause(); }
+      if (v) {
+        v.muted = false;
+        v.volume = 0.6;
+        v.play().catch(() => { });
+      }
     }
   }, [session]);
 
-  // Force video play on mount/update because autoPlay can be flaky
+  // Force video play on mount
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.play().catch(() => { });
@@ -262,19 +254,12 @@ function App() {
               src="/hero_video.mp4"
               autoPlay
               loop
-              muted={true}
+              muted={!session}
               playsInline
               className="absolute inset-0 w-full h-full object-cover opacity-80 z-0"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent/20 to-transparent z-10" />
 
-            {/* Volume Toggle */}
-            <button
-              onClick={toggleAudio}
-              className="absolute bottom-8 right-8 z-30 p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full border border-white/10 text-white transition-all active:scale-95"
-            >
-              {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-            </button>
 
             {/* Bottom overlay — shown on auth screen */}
             {!isLogged && (
@@ -352,14 +337,24 @@ function App() {
               {gameState?.game_over ? 'New Game / Setup' : 'Abandon Match'}
             </button>
 
-            {/* Persistent Audio Control for Gameplay Screen */}
+            {/* Music Control for Gameplay Screen */}
             <div className="mt-4 flex justify-center">
               <button
-                onClick={toggleAudio}
-                className={`p-3 rounded-full border transition-all active:scale-95 shadow-md flex items-center gap-2 ${isMuted ? 'bg-slate-700 hover:bg-slate-600 border-slate-600 text-white' : 'bg-blue-600 hover:bg-blue-500 border-blue-500 text-white animate-pulse'}`}
+                onClick={() => {
+                  const next = !isMusicMuted;
+                  setIsMusicMuted(next);
+                  if (audioRef.current) {
+                    if (next) audioRef.current.pause();
+                    else {
+                      audioRef.current.volume = 0.7;
+                      audioRef.current.play().catch(() => { });
+                    }
+                  }
+                }}
+                className={`p-3 rounded-full border transition-all active:scale-95 shadow-md flex items-center gap-2 ${isMusicMuted ? 'bg-slate-700 hover:bg-slate-600 border-slate-600 text-white' : 'bg-blue-600 hover:bg-blue-500 border-blue-500 text-white animate-pulse'}`}
               >
-                {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                <span className="text-[10px] uppercase font-bold tracking-widest">{isMuted ? 'Music Off' : 'Music On'}</span>
+                {isMusicMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                <span className="text-[10px] uppercase font-bold tracking-widest">{isMusicMuted ? 'Music Off' : 'Music On'}</span>
               </button>
             </div>
           </div>
