@@ -114,23 +114,40 @@ function App() {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const audioRef = React.useRef<HTMLAudioElement>(null);
 
-  // Unified audio control
-  useEffect(() => {
+  const toggleAudio = () => {
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+
+    if (audioRef.current) {
+      if (nextMuted) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.volume = 0.7;
+        audioRef.current.play().catch(e => console.warn("Audio play blocked:", e));
+      }
+    }
     if (videoRef.current) {
-      if (isMuted) videoRef.current.muted = true;
-      else videoRef.current.muted = false;
+      videoRef.current.muted = nextMuted;
       videoRef.current.play().catch(() => { });
     }
-    if (audioRef.current) {
-      if (isMuted) audioRef.current.pause();
-      else audioRef.current.play().catch(() => { });
+  };
+
+  // Re-sync on session change (auto-play if already unmuted)
+  useEffect(() => {
+    if (!isMuted && audioRef.current) {
+      audioRef.current.volume = 0.7;
+      audioRef.current.play().catch(() => { });
     }
-  }, [isMuted]);
+    if (videoRef.current) {
+      videoRef.current.muted = isMuted;
+      videoRef.current.play().catch(() => { });
+    }
+  }, [session]);
 
   // Force video play on mount/update because autoPlay can be flaky
   useEffect(() => {
     if (videoRef.current) {
-      videoRef.current.play().catch(e => console.error("Autoplay failed:", e));
+      videoRef.current.play().catch(() => { });
     }
   }, [session]);
 
@@ -245,7 +262,7 @@ function App() {
               src="/hero_video.mp4"
               autoPlay
               loop
-              muted={isMuted}
+              muted={true}
               playsInline
               className="absolute inset-0 w-full h-full object-cover opacity-80 z-0"
             />
@@ -253,7 +270,7 @@ function App() {
 
             {/* Volume Toggle */}
             <button
-              onClick={() => setIsMuted(!isMuted)}
+              onClick={toggleAudio}
               className="absolute bottom-8 right-8 z-30 p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full border border-white/10 text-white transition-all active:scale-95"
             >
               {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
@@ -338,8 +355,8 @@ function App() {
             {/* Persistent Audio Control for Gameplay Screen */}
             <div className="mt-4 flex justify-center">
               <button
-                onClick={() => setIsMuted(!isMuted)}
-                className="p-3 bg-slate-700 hover:bg-slate-600 rounded-full border border-slate-600 text-white transition-all active:scale-95 shadow-md flex items-center gap-2"
+                onClick={toggleAudio}
+                className={`p-3 rounded-full border transition-all active:scale-95 shadow-md flex items-center gap-2 ${isMuted ? 'bg-slate-700 hover:bg-slate-600 border-slate-600 text-white' : 'bg-blue-600 hover:bg-blue-500 border-blue-500 text-white animate-pulse'}`}
               >
                 {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
                 <span className="text-[10px] uppercase font-bold tracking-widest">{isMuted ? 'Music Off' : 'Music On'}</span>
@@ -352,8 +369,9 @@ function App() {
       {/* Root audio element — stays mounted and independent of screens */}
       <audio
         ref={audioRef}
-        src="https://www.chosic.com/wp-content/uploads/2021/07/The-Old-Tower-Inn.mp3"
+        src="/background_music.mp3"
         loop
+        preload="auto"
       />
     </div>
   );
