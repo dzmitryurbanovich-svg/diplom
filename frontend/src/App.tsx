@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { GameBoard } from './GameBoard';
 import { authLogin, authRegister, startNewGame, fetchGameState, applyMove, triggerAiStep } from './api';
 import type { GameState } from './types';
-import { PlayCircle, LogIn, LayoutDashboard } from 'lucide-react';
-import heroBg from './assets/hero_bg.jpg';
+import { PlayCircle, LogIn, LayoutDashboard, Volume2, VolumeX } from 'lucide-react';
 
 // ─── Left-panel content components ───────────────────────────────────────────
 // Keeping them as sub-components with a key prop triggers the CSS re-animation
@@ -111,6 +110,15 @@ function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [p1, setP1] = useState('Human');
   const [p2, setP2] = useState('Star2.5');
+  const [isMuted, setIsMuted] = useState(true); // Default muted due to browser policy
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+
+  // Force video play on mount/update because autoPlay can be flaky
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.play().catch(e => console.error("Autoplay failed:", e));
+    }
+  }, [session]);
 
   // ─── Auto-login from localStorage ──────────────────────────────────────────
   useEffect(() => {
@@ -222,16 +230,26 @@ function App() {
           </div>
         </div>
 
-        {/* Right Panel — hero image is ALWAYS mounted, never reloads */}
+        {/* Right Panel — hero video is ALWAYS mounted, never reloads */}
         <div className="hidden lg:block relative flex-grow min-h-screen bg-slate-950">
-          <img
-            src={heroBg}
-            alt="Castle Hero"
-            className="absolute inset-0 w-full h-full object-cover opacity-80"
-            loading="eager"
-            decoding="async"
+          <video
+            ref={videoRef}
+            src="/hero_video.mp4"
+            autoPlay
+            loop
+            muted={isMuted}
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover opacity-80 z-0"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent z-10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent/20 to-transparent z-10" />
+
+          {/* Volume Toggle */}
+          <button
+            onClick={() => setIsMuted(!isMuted)}
+            className="absolute bottom-8 right-8 z-30 p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full border border-white/10 text-white transition-all active:scale-95"
+          >
+            {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+          </button>
 
           {/* Bottom overlay — shown on auth screen */}
           {!isLogged && (
