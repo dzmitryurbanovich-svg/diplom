@@ -10,7 +10,7 @@ class CarcassonneAgent:
     def __init__(self, name: str):
         self.name = name
 
-    def select_move(self, board: Board, tile: Tile, legal_moves: List[Tuple[int, int, int]], current_meeples: int) -> Tuple[int, int, int, Optional[int]]:
+    def select_move(self, board: Board, tile: Tile, legal_moves: List[Tuple[int, int, int]], current_meeples: int, remaining_tiles: int = 72) -> Tuple[int, int, int, Optional[int]]:
         """
         Returns (x, y, rotation, meeple_segment_index)
         If meeple_segment_index is None, no meeple is placed.
@@ -19,7 +19,7 @@ class CarcassonneAgent:
 
 class GreedyAgent(CarcassonneAgent):
     """Simple baseline that picks the first legal move and places a meeple randomly 20% of the time."""
-    def select_move(self, board: Board, tile: Tile, legal_moves: List[Tuple[int, int, int]], current_meeples: int) -> Tuple[int, int, int, Optional[int]]:
+    def select_move(self, board: Board, tile: Tile, legal_moves: List[Tuple[int, int, int]], current_meeples: int, remaining_tiles: int = 72) -> Tuple[int, int, int, Optional[int]]:
         if not legal_moves:
             return 0, 0, 0, None
         
@@ -38,7 +38,7 @@ class StarAgent(CarcassonneAgent):
     We prioritize moves that complete our own features or score immediate points.
     We save meeples unless we find a high-value city/road/monastery.
     """
-    def select_move(self, board: Board, tile: Tile, legal_moves: List[Tuple[int, int, int]], current_meeples: int) -> Tuple[int, int, int, Optional[int]]:
+    def select_move(self, board: Board, tile: Tile, legal_moves: List[Tuple[int, int, int]], current_meeples: int, remaining_tiles: int = 72) -> Tuple[int, int, int, Optional[int]]:
         if not legal_moves:
             return 0, 0, 0, None
 
@@ -87,7 +87,7 @@ class MCTSAgent(CarcassonneAgent):
     Does random playouts for a subset of legal moves to estimate win probability.
     Due to Python CPU limits in a Gradio thread, we use a very shallow rollout.
     """
-    def select_move(self, board: Board, tile: Tile, legal_moves: List[Tuple[int, int, int]], current_meeples: int) -> Tuple[int, int, int, Optional[int]]:
+    def select_move(self, board: Board, tile: Tile, legal_moves: List[Tuple[int, int, int]], current_meeples: int, remaining_tiles: int = 72) -> Tuple[int, int, int, Optional[int]]:
         if not legal_moves:
             return 0, 0, 0, None
             
@@ -107,82 +107,106 @@ class MCTSAgent(CarcassonneAgent):
         return tx, ty, rot, meeple_idx
 
 # --- Hybrid LLM Logic ---
-import httpx
-
-HF_API_URL = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct"
+import json
+import re
+from huggingface_hub import InferenceClient
 
 class HybridLLMAgent(CarcassonneAgent):
     def __init__(self, name: str, hf_token: str):
         super().__init__(name)
         self.token = hf_token
+        # InferenceClient handles endpoint routing (api-inference vs router) automatically
+        self.client = InferenceClient(token=self.token.strip())
         self.last_strategy = "GREEDY"
-        self.last_rationale = ""
+        self.last_rationale = "No games played yet."
+        print(f"[HYBRID] Initialized with InferenceClient (token: {self.token[:5]}...)", flush=True)
 
-    def _get_llm_strategy(self, tile_name: str, legal_moves: List, current_meeples: int, remaining_tiles: int) -> Tuple[str, str]:
-        if not self.token.strip(): return "GREEDY", "No API token provided."
-        
-        # PERSISTENT LEARNING: Load lessons from past games
-        past_lessons = game_telemetry.get_past_lessons(self.name)
-        
-        # SITREP: Situational Report for the General
+    def _get_llm_strategy(self, tile_name: str, legal_moves: list, meeple_count: int, remaining_tiles: int, past_lessons: str):
+        if not self.token.strip(): 
+            return "GREEDY", "No API token provided."
+
         user_content = TOT_PROMPT_TEMPLATE.format(
             tile_name=tile_name,
-            legal_moves=str(legal_moves[:5]), # Just the first 5 for clarity
-            meeples_left=current_meeples,
+            legal_moves=str(legal_moves[:5]), # Truncate for tokens
+            meeples_left=meeple_count,
             tiles_remaining=remaining_tiles
         )
         
-        # General's Orders Formulation with Memory
-        prompt = f"<s>[INST] <<SYS>>\n{SYSTEM_PROMPT}\n\nPast Lessons Learned:\n{past_lessons}\n<</SYS>>\n\n{user_content}[/INST]"
+        # Priority list of models known to be free/serverless
+        models = [
+            "meta-llama/Llama-3.2-3B-Instruct",
+            "meta-llama/Llama-3.1-8B-Instruct",
+            "Qwen/Qwen2.5-7B-Instruct",
+            "microsoft/Phi-3-mini-4k-instruct"
+        ]
         
-        headers = {"Authorization": f"Bearer {self.token.strip()}"}
-        payload = {"inputs": prompt, "parameters": {"return_full_text": False, "max_new_tokens": 100, "stop": ["\n\n"]} }
+        text = ""
+        for model_id in models:
+            try:
+                print(f"[LLM DEBUG] Trying model: {model_id}", flush=True)
+                response = self.client.chat_completion(
+                    model=model_id,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT + f"\n\nPast Lessons Learned:\n{past_lessons}"},
+                        {"role": "user", "content": user_content}
+                    ],
+                    max_tokens=250,
+                    temperature=0.3
+                )
+                text = response.choices[0].message.content.strip()
+                if text:
+                    print(f"[LLM SUCCESS] Model {model_id} responded.", flush=True)
+                    break 
+            except Exception as e:
+                print(f"[LLM WARNING] Model {model_id} failed: {e}", flush=True)
+                continue
+
+        if not text:
+            print("[LLM ERROR] All models failed or returned empty text.", flush=True)
+            return "GREEDY", "Emergency Fallback: All AI models unavailable."
+
+        print(f"[LLM DEBUG] Raw Text: {text}", flush=True)
         
-        try:
-            response = httpx.post(HF_API_URL, headers=headers, json=payload, timeout=30.0)
-            result = response.json()
-            if isinstance(result, list): text = result[0].get('generated_text', '').strip()
-            else: text = result.get('generated_text', '').strip()
-            
-            # Extract order and rationale
-            order = "GREEDY"
-            for k in ["CITY", "ROAD", "MONASTERY", "GREEDY", "BLOCKING"]:
-                if k in text.upper():
-                    order = k
-                    break
-            
-            rationale = "No explicit rationale provided by LLM."
-            if "RATIONALE:" in text.upper():
-                rationale = text.upper().split("RATIONALE:")[-1].strip()
-                
-            self.last_strategy = order
-            self.last_rationale = rationale
-            print(f"[GENERAL {self.name}] Order: {order} | Rationale: {rationale}")
-            return order, rationale
-        except Exception as e:
-            print(f"LLM Error: {e}")
-            self.last_strategy = "GREEDY"
-            self.last_rationale = f"Error communicating with LLM: {str(e)}"
-            return "GREEDY", self.last_rationale
+        # Extract order and rationale
+        order = "GREEDY"
+        rationale = "No explicit rationale provided by LLM."
+        
+        lines = text.split('\n')
+        for line in lines:
+            line_upper = line.upper()
+            if 'ORDER:' in line_upper:
+                order_val = line.split(':')[-1].strip().upper()
+                # Clean up punctuation
+                order_val = re.sub(r'[^A-Z]', '', order_val)
+                if order_val in ["CITY", "ROAD", "MONASTERY", "GREEDY", "BLOCKING"]:
+                    order = order_val
+            elif 'RATIONALE:' in line_upper:
+                rationale = line.split(':', 1)[-1].strip()
+        
+        self.last_strategy = order
+        self.last_rationale = rationale
+        return order, rationale
 
     def select_move(self, board: Board, tile: Tile, legal_moves: List[Tuple[int, int, int]], current_meeples: int, remaining_tiles: int = 72) -> Tuple[int, int, int, Optional[int]]:
         if not legal_moves:
             return 0, 0, 0, None
             
-        strategy, rationale = self._get_llm_strategy(tile.name, legal_moves, current_meeples, remaining_tiles)
+        # Load lessons from past games
+        past_lessons = game_telemetry.get_past_lessons(self.name)
         
+        strategy, rationale = self._get_llm_strategy(tile.name, legal_moves, current_meeples, remaining_tiles, past_lessons)
+        print(f"[GENERAL {self.name}] Order: {strategy} | Rationale: {rationale}", flush=True)
+
         # --- SOLDIER LOGIC: Execute General's Strategy ---
         best_move = legal_moves[0]
         best_meeple = None
         best_tactical_score = -1
         
-        # We look for the best move that aligns with the General's command
         for tx, ty, rot in legal_moves:
             score = 0
             meeple_idx = None
             
-            # Heuristic: Check how many neighbors match the chosen strategy
-            # (Simplified: we count how many adjacent tiles exist to ensure connectivity)
+            # Simple neighbor metric
             neighbors = sum(1 for dx, dy in [(0,1), (1,0), (0,-1), (-1,0)] if (tx+dx, ty+dy) in board.grid)
             score += neighbors
             
@@ -191,22 +215,20 @@ class HybridLLMAgent(CarcassonneAgent):
                 for i, seg in enumerate(tile.segments):
                     seg_type = seg.type.name
                     if strategy == "CITY" and seg_type == "CITY":
-                        score += 15 # High priority for city expansion
+                        score += 15
                         meeple_idx = i
                         break
                     elif strategy == "ROAD" and seg_type == "ROAD":
-                        score += 8 # Priority for road expansion
+                        score += 8
                         meeple_idx = i
                         break
                     elif strategy == "MONASTERY" and seg_type == "MONASTERY":
-                        score += 20 # Highest priority for monasteries
+                        score += 20
                         meeple_idx = i
                         break
                     elif strategy == "BLOCKING":
-                        # In blocking mode, we look for 'locked' positions 
-                        # We value neighbors but avoid placing meeples on contested features
                         score += neighbors * 4 
-                        meeple_idx = None # Soldier decides NOT to place a meeple to save resources
+                        meeple_idx = None
                         break
                     elif strategy == "GREEDY":
                         if seg_type in ["CITY", "MONASTERY"]:
@@ -217,7 +239,6 @@ class HybridLLMAgent(CarcassonneAgent):
                             score += 2
                             meeple_idx = i
             
-            # Add a small random noise to tactical scoring to avoid deterministic stagnation
             score += random.uniform(0, 0.5)
 
             if score > best_tactical_score:
@@ -225,7 +246,4 @@ class HybridLLMAgent(CarcassonneAgent):
                 best_move = (tx, ty, rot)
                 best_meeple = meeple_idx
         
-        # Store for centralized telemetry in app.py
-        self.last_strategy = strategy
-                
         return best_move[0], best_move[1], best_move[2], best_meeple

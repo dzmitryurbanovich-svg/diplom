@@ -7,3 +7,4 @@ asyncer
 httpx
 typing-extensions
 python-multipart
+huggingface_hub

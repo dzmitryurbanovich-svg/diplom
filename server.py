@@ -46,6 +46,22 @@ async def debug_list_files():
     except Exception as e:
         return {"error": str(e)}
 
+@app.get("/api/diag")
+async def get_diagnostics():
+    from src.logic.telemetry import game_telemetry
+    summary_path = os.path.join(game_telemetry.log_dir, "summary_stats.jsonl")
+    
+    diag = {
+        "hf_token_set": bool(os.environ.get("HF_TOKEN")),
+        "log_dir": game_telemetry.log_dir,
+        "log_dir_exists": os.path.exists(game_telemetry.log_dir),
+        "summary_file_exists": os.path.exists(summary_path),
+        "summary_file_size": os.path.getsize(summary_path) if os.path.exists(summary_path) else 0,
+        "sessions_count": len(sessions),
+        "cwd": os.getcwd()
+    }
+    return diag
+
 class GameSession:
     def __init__(self, p1_str="Human", p2_str="Star2.5"):
         self.p1_type = p1_str
@@ -235,7 +251,15 @@ async def ai_step_endpoint(session_id: str):
     if agent is None: return {"success": False, "message": "Not an AI turn"}
     
     gs.logs.append(f"🤖 [THINKING] {gs.current_player} ({agent.name}) is analyzing board...")
-    def sync_ai(): return agent.select_move(gs.board, gs.pending_tile, gs.pending_legal_moves, gs.meeples[gs.current_player] > 0)
+    def sync_ai():
+        # Pass both counts: current meeples and remaining tiles
+        return agent.select_move(
+            gs.board, 
+            gs.pending_tile, 
+            gs.pending_legal_moves, 
+            gs.meeples[gs.current_player],
+            len(gs.deck)
+        )
     
     try:
         # Agents return (x, y, rot, meeple_idx) or they used to return (best_move, meeple_idx, logs)

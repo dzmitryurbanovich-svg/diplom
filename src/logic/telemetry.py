@@ -10,14 +10,27 @@ class TelemetryManager:
     """
     def __init__(self, log_dir: str = None):
         if log_dir is None:
-            # Use project root/logs/telemetry
-            base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            self.log_dir = os.path.join(base_path, "logs", "telemetry")
+            # Check if we are on HF Spaces (usually /app)
+            if os.path.exists("/app"):
+                self.log_dir = "/app/logs/telemetry"
+            else:
+                base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                self.log_dir = os.path.join(base_path, "logs", "telemetry")
         else:
             self.log_dir = log_dir
             
-        print(f"[TELEMETRY] Initializing in: {self.log_dir}")
-        os.makedirs(self.log_dir, exist_ok=True)
+        print(f"[TELEMETRY] Initializing in: {self.log_dir}", flush=True)
+        try:
+            os.makedirs(self.log_dir, exist_ok=True)
+            # Test write access
+            test_file = os.path.join(self.log_dir, ".write_test")
+            with open(test_file, "w") as f:
+                f.write("test")
+            os.remove(test_file)
+            print(f"[TELEMETRY] Write permissions verified in {self.log_dir}", flush=True)
+        except Exception as e:
+            print(f"[TELEMETRY ERROR] Could not initialize or write to {self.log_dir}: {e}", flush=True)
+
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.game_log_path = os.path.join(self.log_dir, f"game_{self.session_id}.jsonl")
         self.current_game_history: List[Dict[str, Any]] = []
@@ -34,8 +47,10 @@ class TelemetryManager:
             path = self.game_log_path
 
         # Append to log file
+        print(f"[TELEMETRY] Logging turn to {path}", flush=True)
         with open(path, "a", encoding="utf-8") as f:
             f.write(json.dumps(turn_data, ensure_ascii=False) + "\n")
+            f.flush()
 
     def finalize_game(self, final_scores: Dict[str, int], winner: str):
         """Saves the final result and summary of the game."""
@@ -48,10 +63,15 @@ class TelemetryManager:
         }
         
         summary_path = os.path.join(self.log_dir, "summary_stats.jsonl")
-        print(f"[TELEMETRY] Finalizing game. Writing to: {summary_path}")
-        with open(summary_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(summary, ensure_ascii=False) + "\n")
-        print(f"[TELEMETRY] Done writing summary. Total turns logged: {summary['total_turns']}")
+        print(f"[TELEMETRY] Finalizing game summary to {summary_path}", flush=True)
+        print(f"[TELEMETRY] Summary data: {summary}", flush=True)
+        try:
+            with open(summary_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(summary, ensure_ascii=False) + "\n")
+                f.flush()
+            print(f"[TELEMETRY] Successfully wrote summary to {summary_path}. Current size: {os.path.getsize(summary_path)} bytes", flush=True)
+        except Exception as e:
+            print(f"[TELEMETRY ERROR] Failed to write summary: {e}", flush=True)
             
     def list_logs(self) -> List[str]:
         """Returns a list of all telemetry log files."""

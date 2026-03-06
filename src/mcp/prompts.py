@@ -1,25 +1,23 @@
-SYSTEM_PROMPT = """You are a Grandmaster Carcassonne Strategist. 
-Your goal is to maximize your own score while strategically blocking your opponent and controlling key territory.
-You balance short-term point gains with long-term placement potential.
-You are the 'General' in a General-Soldier architecture: you provide the strategic vision, while the code executes the tactical layout."""
+SYSTEM_PROMPT = """You are a Carcassonne Grandmaster. 
+Think carefully about each move. Your goal is to maximize points and block opponents.
+Provide your final choice in the format:
+ORDER: [CATEGORY]
+RATIONALE: [REASON]"""
 
-TOT_PROMPT_TEMPLATE = """### General-Soldier SITREP
-Current Tile: {tile_name}
-Legal Moves (truncated): {legal_moves}
-Meeples Remaining: {meeples_left}/7
-Tiles Remaining in Deck: {tiles_remaining}/72
+TOT_PROMPT_TEMPLATE = """### GAME STATE
+Tile: {tile_name}
+Moves: {legal_moves}
+Meeples: {meeples_left}/7
+Deck: {tiles_remaining} remaining
 
-### Strategy Generation (Tree of Thoughts)
-Please follow this reasoning chain:
-1. **Exploration**: Identify 3 distinct strategic paths (e.g., Aggressive Expansion, Blocking, Greedy Scoring).
-2. **Simulation**: For each path, evaluate the potential state after 2 turns.
-3. **Evaluation**: Assign a confidence score (0-10) to each path based on current resources.
-4. **Final Order**: Choose the best path.
+### INSTRUCTION
+1. Analyze the legal moves.
+2. Choose the best strategy (CITY, ROAD, MONASTERY, GREEDY, or BLOCKING).
+3. Provide a one-sentence rationale.
 
-### Response Format
-Order: [CITY / ROAD / MONASTERY / GREEDY / BLOCKING]
-Rationale: [One sentence explaining why this path was chosen]
-"""
+### RESPONSE
+ORDER: 
+RATIONALE: """
 
 # Tool for reflecting on previous bad results
 REFLEXION_PROMPT_TEMPLATE = """### Reflexion Cycle
