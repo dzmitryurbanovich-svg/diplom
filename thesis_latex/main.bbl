@@ -1,0 +1,48 @@
+\begin{thebibliography}{1}
+
+\bibitem{ameneyro2020playing}
+F.~Ameneyro et~al.
+\newblock Playing carcassonne with monte carlo tree search.
+\newblock 2020.
+
+\bibitem{browne2012mcts}
+C.~B. Browne et~al.
+\newblock A survey of monte carlo tree search methods.
+\newblock In {\em IEEE Transactions on Computational Intelligence and AI in
+  Games}, 2012.
+
+\bibitem{heyden2009implementing}
+C.~Heyden.
+\newblock Implementing a computer player for carcassonne. (star2.5 analysis).
+\newblock 2009.
+
+\bibitem{knuth2000dancing}
+D.~E. Knuth.
+\newblock Dancing links. (exact cover algorithms).
+
+\bibitem{shinn2023reflexion}
+N.~Shinn et~al.
+\newblock Reflexion: Language agents with verbal reinforcement learning.
+  (Методология обучения через вербальную
+  рефлексию).
+\newblock 2023.
+
+\bibitem{silver2017alphazero}
+D.~Silver et~al.
+\newblock Mastering chess and shogi by self-play with a general reinforcement
+  learning algorithm (alphazero).
+\newblock {\em arXiv preprint arXiv:1712.01815}, 2017.
+
+\bibitem{wrede2000carcassonne}
+K.-J. Wrede.
+\newblock {\em Carcassonne: The Rulebook and Concept}.
+\newblock Hans im Glück, 2000.
+
+\bibitem{yao2024tree}
+S.~Yao et~al.
+\newblock Tree of thoughts: Deliberate problem solving with large language
+  models. (Методология использования llm для
+  стратегического планирования).
+\newblock 2024.
+
+\end{thebibliography}

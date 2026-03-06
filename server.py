@@ -62,6 +62,22 @@ async def get_diagnostics():
     }
     return diag
 
+@app.get("/api/telemetry/summary")
+async def download_summary():
+    from src.logic.telemetry import game_telemetry
+    summary_path = os.path.join(game_telemetry.log_dir, "summary_stats.jsonl")
+    if os.path.exists(summary_path):
+        return FileResponse(summary_path, filename="summary_stats.jsonl")
+    raise HTTPException(status_code=404, detail="Summary file not found yet. Complete a game first!")
+
+@app.get("/api/telemetry/list")
+async def list_telemetry_files():
+    from src.logic.telemetry import game_telemetry
+    if not os.path.exists(game_telemetry.log_dir):
+        return {"files": []}
+    files = os.listdir(game_telemetry.log_dir)
+    return {"files": files, "log_dir": game_telemetry.log_dir}
+
 class GameSession:
     def __init__(self, p1_str="Human", p2_str="Star2.5"):
         self.p1_type = p1_str

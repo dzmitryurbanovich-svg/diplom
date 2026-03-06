@@ -1,0 +1,60 @@
+This is BibTeX, Version 0.99d (TeX Live 2025)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: main.aux
+A level-1 auxiliary file: title.aux
+A level-1 auxiliary file: abstract.aux
+A level-1 auxiliary file: intro.aux
+A level-1 auxiliary file: work.aux
+A level-1 auxiliary file: conclusion.aux
+A level-1 auxiliary file: literature.aux
+The style file: plain.bst
+A level-1 auxiliary file: appendix.aux
+Database file #1: refs.bib
+Warning--empty journal in ameneyro2020playing
+Warning--empty journal in heyden2009implementing
+Warning--empty journal in knuth2000dancing
+Warning--empty year in knuth2000dancing
+Warning--empty journal in shinn2023reflexion
+Warning--empty journal in yao2024tree
+You've used 8 entries,
+            2118 wiz_defined-function locations,
+            538 strings with 5155 characters,
+and the built_in function-call counts, 1853 in all, are:
+= -- 167
+> -- 86
+< -- 0
++ -- 35
+- -- 26
+* -- 85
+:= -- 343
+add.period$ -- 23
+call.type$ -- 8
+change.case$ -- 31
+chr.to.int$ -- 0
+cite$ -- 14
+duplicate$ -- 86
+empty$ -- 153
+format.name$ -- 26
+if$ -- 373
+int.to.chr$ -- 0
+int.to.str$ -- 8
+missing$ -- 9
+newline$ -- 42
+num.names$ -- 16
+pop$ -- 52
+preamble$ -- 1
+purify$ -- 24
+quote$ -- 0
+skip$ -- 64
+stack$ -- 0
+substring$ -- 41
+swap$ -- 4
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 30
+warning$ -- 6
+while$ -- 16
+width$ -- 9
+write$ -- 75
+(There were 6 warnings)

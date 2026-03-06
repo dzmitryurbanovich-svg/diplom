@@ -20,32 +20,27 @@
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture & Organization
 
-```
-diplom/
-├── server.py              # FastAPI backend & game session manager
-├── src/
-│   ├── logic/
-│   │   ├── engine.py      # Board, DSU territory engine, scoring
-│   │   ├── agents.py      # AI agents (Greedy, MCTS, Star2.5, Hybrid LLM)
-│   │   ├── deck.py        # Full tile definitions (C3 asset set)
-│   │   ├── models.py      # Tile, Segment, Side data models
-│   │   └── auth_manager.py
-│   └── mcp/               # Model Context Protocol server (experimental)
-├── frontend/
-│   ├── src/
-│   │   ├── App.tsx        # Main app: Auth, Setup, Game screens
-│   │   ├── GameBoard.tsx  # Interactive canvas board component
-│   │   ├── api.ts         # API client layer
-│   │   └── types.ts       # TypeScript types
-│   └── dist/              # Production build (served by FastAPI)
-├── demos/                 # Standalone scripts: tournaments, LLM experiments
-├── assets/                # Tile & meeple images (C3 edition)
-├── game_logs/             # Auto-generated JSONL training data (runtime)
-├── Dockerfile             # Multi-stage build for HF Spaces
-└── deploy_to_hf.py        # One-command deployment script
-```
+The repository is divided into three distinct areas:
+
+### 1. 🌐 Web Game (Server)
+Everything needed to run the interactive Carcassonne game on **Hugging Face Spaces** or locally.
+- `server.py`: FastAPI backend, session manager, and diagnostic endpoints.
+- `src/logic/`: The core game engine (DSU-based), rule validation, and unified AI agents.
+- `frontend/`: React + Three.js interactive board (Source & Built assets).
+- `assets/`: 4K Tile textures and meeple models.
+
+### 2. 🧪 AI Research & Analytics
+Command-line tools for academic benchmarking and data collection.
+- `scripts_research/`: 
+  - `tournament_runner.py`: Run extensive game brackets (e.g., MCTS vs Hybrid LLM) and extract Win/Loss statistics.
+  - `play_game_ai.py`: CLI-based game engine viewer with verbose tactical logs.
+- `logs/telemetry/`: Auto-generated JSONL datasets from both Web and CLI gameplay.
+
+### 3. 🎓 Diploma Thesis (Academic)
+- `thesis_latex/`: Complete LaTeX source code, PDF, and presentation for the graduation thesis.
+- `thesis_latex/docs/`: Academic literature and research papers.
 
 ---
 
