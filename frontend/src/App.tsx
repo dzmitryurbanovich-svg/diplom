@@ -112,6 +112,20 @@ function App() {
   const [p2, setP2] = useState('Star2.5');
   const [isMuted, setIsMuted] = useState(true); // Default muted due to browser policy
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const audioRef = React.useRef<HTMLAudioElement>(null);
+
+  // Unified audio control
+  useEffect(() => {
+    if (videoRef.current) {
+      if (isMuted) videoRef.current.muted = true;
+      else videoRef.current.muted = false;
+      videoRef.current.play().catch(() => { });
+    }
+    if (audioRef.current) {
+      if (isMuted) audioRef.current.pause();
+      else audioRef.current.play().catch(() => { });
+    }
+  }, [isMuted]);
 
   // Force video play on mount/update because autoPlay can be flaky
   useEffect(() => {
@@ -201,136 +215,146 @@ function App() {
     return () => clearTimeout(timer);
   }, [session, gameState]);
 
-  // ─── Pre-game screens (Auth + Setup) ─────────────────────────────────────
-  // Hero image is rendered ONCE here and stays mounted during both screens.
-  // Switching auth↔setup only swaps the left panel with a slide animation.
-  if (!session) {
-    const heroOverlayText = isLogged
-      ? 'C3 EDITION • HIGH-FIDELITY AI TOURNAMENT'
-      : null;
-
-    return (
-      <div className="min-h-screen w-full flex flex-row overflow-hidden bg-slate-900" style={{ backgroundColor: '#0f172a' }}>
-
-        {/* Left Panel — slides in fresh on each screen change via key prop */}
-        <div className="flex-shrink-0 w-full lg:w-[480px] min-h-screen flex items-center justify-center p-8 z-20 bg-slate-900 shadow-[20px_0_60px_rgba(0,0,0,0.5)]">
-          <div key={isLogged ? 'setup' : 'auth'} className="w-full flex justify-center animate-fade-slide-in">
-            {!isLogged
-              ? <AuthPanel
-                email={email} setEmail={setEmail}
-                password={password} setPassword={setPassword}
-                authMode={authMode} setAuthMode={setAuthMode}
-                onAuth={handleAuth} onGuest={handleGuest}
-              />
-              : <SetupPanel
-                email={email} p1={p1} setP1={setP1} p2={p2} setP2={setP2}
-                onStart={handleStart} onLogout={handleLogout}
-              />
-            }
-          </div>
-        </div>
-
-        {/* Right Panel — hero video is ALWAYS mounted, never reloads */}
-        <div className="hidden lg:block relative flex-grow min-h-screen bg-slate-950">
-          <video
-            ref={videoRef}
-            src="/hero_video.mp4"
-            autoPlay
-            loop
-            muted={isMuted}
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover opacity-80 z-0"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent/20 to-transparent z-10" />
-
-          {/* Volume Toggle */}
-          <button
-            onClick={() => setIsMuted(!isMuted)}
-            className="absolute bottom-8 right-8 z-30 p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full border border-white/10 text-white transition-all active:scale-95"
-          >
-            {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-          </button>
-
-          {/* Bottom overlay — shown on auth screen */}
-          {!isLogged && (
-            <div className="absolute bottom-16 left-16 z-20 text-white max-w-md drop-shadow-2xl animate-fade-in-up">
-              <h2 className="text-4xl font-black mb-4 leading-tight">Master the Medieval Strategy.</h2>
-              <p className="text-slate-200 font-medium leading-relaxed bg-black/20 backdrop-blur-sm p-4 rounded-2xl border border-white/10">
-                Experience the classic Carcassonne enhanced by high-level AI algorithms. Build, compete, and evolve.
-              </p>
-            </div>
-          )}
-
-          {/* Top badge — shown on setup screen */}
-          {isLogged && heroOverlayText && (
-            <div className="absolute top-16 right-16 z-20 animate-fade-in">
-              <div className="bg-black/60 backdrop-blur-md px-6 py-4 rounded-3xl border border-white/10 text-white/60 text-[10px] font-black tracking-widest shadow-2xl">
-                {heroOverlayText}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ─── Game Screen — fades in ───────────────────────────────────────────────
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="h-screen w-screen bg-slate-900 grid grid-rows-[3fr_2fr] md:grid-rows-1 md:grid-cols-[1fr_320px] overflow-hidden text-slate-200 animate-fade-in">
-      {/* Game Board Area */}
-      <div className="relative min-h-0 min-w-0 overflow-hidden border-b md:border-b-0 md:border-r border-slate-700">
-        {gameState && <GameBoard state={gameState} onMove={handleUserMove} />}
-      </div>
-
-      {/* Telemetry Sidebar */}
-      <div className="bg-slate-800 p-4 flex flex-col min-h-0 min-w-0 shadow-2xl z-10 overflow-hidden">
-        <div className="flex justify-between items-center mb-4 shrink-0">
-          <h2 className="text-lg font-bold font-mono text-blue-400">TELEMETRY</h2>
-          {gameState && <span className="text-[10px] text-slate-500 uppercase">Room: {session?.slice(0, 8)}</span>}
-        </div>
-
-        {gameState && (
-          <div className="grid grid-cols-2 md:grid-cols-1 gap-2 text-xs bg-slate-900/50 rounded-lg p-3 border border-slate-700/50 mb-4 shrink-0 shadow-inner">
-            <div className="flex flex-col bg-red-500/10 p-2 rounded border border-red-500/20">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-red-400 font-bold">P1: {gameState.scores['Player1']}</span>
-                <span className="text-[10px]">🛠️ {gameState.meeples['Player1']}</span>
-              </div>
-              <span className="text-[9px] text-red-300/60 uppercase font-mono tracking-tighter">{gameState.player_types['Player1']}</span>
-            </div>
-            <div className="flex flex-col bg-blue-500/10 p-2 rounded border border-blue-500/20">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-blue-400 font-bold">P2: {gameState.scores['Player2']}</span>
-                <span className="text-[10px]">🛠️ {gameState.meeples['Player2']}</span>
-              </div>
-              <span className="text-[9px] text-blue-300/60 uppercase font-mono tracking-tighter">{gameState.player_types['Player2']}</span>
-            </div>
-            <div className="col-span-2 md:col-span-1 pt-1 text-center md:text-left text-slate-500 text-[10px]">
-              DECK: {gameState.deck_remaining} LEFT
+    <div className="h-screen w-screen overflow-hidden bg-slate-900 text-slate-200">
+      {!session ? (
+        <div className="min-h-screen w-full flex flex-row overflow-hidden bg-slate-900" style={{ backgroundColor: '#0f172a' }}>
+          {/* Left Panel — slides in fresh on each screen change via key prop */}
+          <div className="flex-shrink-0 w-full lg:w-[480px] min-h-screen flex items-center justify-center p-8 z-20 bg-slate-900 shadow-[20px_0_60px_rgba(0,0,0,0.5)]">
+            <div key={isLogged ? 'setup' : 'auth'} className="w-full flex justify-center animate-fade-slide-in">
+              {!isLogged
+                ? <AuthPanel
+                  email={email} setEmail={setEmail}
+                  password={password} setPassword={setPassword}
+                  authMode={authMode} setAuthMode={setAuthMode}
+                  onAuth={handleAuth} onGuest={handleGuest}
+                />
+                : <SetupPanel
+                  email={email} p1={p1} setP1={setP1} p2={p2} setP2={setP2}
+                  onStart={handleStart} onLogout={handleLogout}
+                />
+              }
             </div>
           </div>
-        )}
 
-        <h3 className="font-bold text-slate-500 text-[10px] uppercase tracking-widest mb-2 shrink-0">Game Logs</h3>
-        <div className="flex-1 min-h-0 font-mono text-[9px] overflow-y-auto w-full break-words bg-black/30 backdrop-blur-sm p-2 rounded border border-white/5 custom-scrollbar flex flex-col-reverse">
-          <div className="flex flex-col">
-            {gameState?.logs.map((L, i) => (
-              <div key={i} className="py-1 border-b border-white/5 opacity-70 hover:opacity-100 transition-opacity">
-                <span className="text-slate-600 mr-2">{i + 1}.</span>
-                {L}
+          {/* Right Panel — hero video is ALWAYS mounted, never reloads */}
+          <div className="hidden lg:block relative flex-grow min-h-screen bg-slate-950">
+            <video
+              ref={videoRef}
+              src="/hero_video.mp4"
+              autoPlay
+              loop
+              muted={isMuted}
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover opacity-80 z-0"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent/20 to-transparent z-10" />
+
+            {/* Volume Toggle */}
+            <button
+              onClick={() => setIsMuted(!isMuted)}
+              className="absolute bottom-8 right-8 z-30 p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full border border-white/10 text-white transition-all active:scale-95"
+            >
+              {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+            </button>
+
+            {/* Bottom overlay — shown on auth screen */}
+            {!isLogged && (
+              <div className="absolute bottom-16 left-16 z-20 text-white max-w-md drop-shadow-2xl animate-fade-in-up">
+                <h2 className="text-4xl font-black mb-4 leading-tight">Master the Medieval Strategy.</h2>
+                <p className="text-slate-200 font-medium leading-relaxed bg-black/20 backdrop-blur-sm p-4 rounded-2xl border border-white/10">
+                  Experience the classic Carcassonne enhanced by high-level AI algorithms. Build, compete, and evolve.
+                </p>
               </div>
-            ))}
-            {(!gameState?.logs || gameState.logs.length === 0) && <div className="text-slate-600 italic">No logs yet...</div>}
+            )}
+
+            {/* Top badge — shown on setup screen */}
+            {isLogged && (
+              <div className="absolute top-16 right-16 z-20 animate-fade-in">
+                <div className="bg-black/60 backdrop-blur-md px-6 py-4 rounded-3xl border border-white/10 text-white/60 text-[10px] font-black tracking-widest shadow-2xl">
+                  C3 EDITION • HIGH-FIDELITY AI TOURNAMENT
+                </div>
+              </div>
+            )}
           </div>
         </div>
+      ) : (
+        <div className="h-screen w-screen bg-slate-900 grid grid-rows-[3fr_2fr] md:grid-rows-1 md:grid-cols-[1fr_320px] overflow-hidden animate-fade-in">
+          {/* Game Board Area */}
+          <div className="relative min-h-0 min-w-0 overflow-hidden border-b md:border-b-0 md:border-r border-slate-700">
+            {gameState && <GameBoard state={gameState} onMove={handleUserMove} />}
+          </div>
 
-        <button
-          onClick={handleEndSession}
-          className={`mt-4 p-2 w-full rounded text-xs font-bold transition-all shadow-lg active:scale-95 shrink-0 ${gameState?.game_over ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-red-600/80 hover:bg-red-500 text-white'}`}
-        >
-          {gameState?.game_over ? 'New Game / Setup' : 'Abandon Match'}
-        </button>
-      </div>
+          {/* Telemetry Sidebar */}
+          <div className="bg-slate-800 p-4 flex flex-col min-h-0 min-w-0 shadow-2xl z-10 overflow-hidden">
+            <div className="flex justify-between items-center mb-4 shrink-0">
+              <h2 className="text-lg font-bold font-mono text-blue-400">TELEMETRY</h2>
+              {gameState && <span className="text-[10px] text-slate-500 uppercase">Room: {session?.slice(0, 8)}</span>}
+            </div>
+
+            {gameState && (
+              <div className="grid grid-cols-2 md:grid-cols-1 gap-2 text-xs bg-slate-900/50 rounded-lg p-3 border border-slate-700/50 mb-4 shrink-0 shadow-inner">
+                <div className="flex flex-col bg-red-500/10 p-2 rounded border border-red-500/20">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-red-400 font-bold">P1: {gameState.scores['Player1']}</span>
+                    <span className="text-[10px]">🛠️ {gameState.meeples['Player1']}</span>
+                  </div>
+                  <span className="text-[9px] text-red-300/60 uppercase font-mono tracking-tighter">{gameState.player_types['Player1']}</span>
+                </div>
+                <div className="flex flex-col bg-blue-500/10 p-2 rounded border border-blue-500/20">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-blue-400 font-bold">P2: {gameState.scores['Player2']}</span>
+                    <span className="text-[10px]">🛠️ {gameState.meeples['Player2']}</span>
+                  </div>
+                  <span className="text-[9px] text-blue-300/60 uppercase font-mono tracking-tighter">{gameState.player_types['Player2']}</span>
+                </div>
+                <div className="col-span-2 md:col-span-1 pt-1 text-center md:text-left text-slate-500 text-[10px]">
+                  DECK: {gameState.deck_remaining} LEFT
+                </div>
+              </div>
+            )}
+
+            <h3 className="font-bold text-slate-500 text-[10px] uppercase tracking-widest mb-2 shrink-0">Game Logs</h3>
+            <div className="flex-1 min-h-0 font-mono text-[9px] overflow-y-auto w-full break-words bg-black/30 backdrop-blur-sm p-2 rounded border border-white/5 custom-scrollbar flex flex-col-reverse">
+              <div className="flex flex-col">
+                {gameState?.logs.map((L, i) => (
+                  <div key={i} className="py-1 border-b border-white/5 opacity-70 hover:opacity-100 transition-opacity">
+                    <span className="text-slate-600 mr-2">{i + 1}.</span>
+                    {L}
+                  </div>
+                ))}
+                {(!gameState?.logs || gameState.logs.length === 0) && <div className="text-slate-600 italic">No logs yet...</div>}
+              </div>
+            </div>
+
+            <button
+              onClick={handleEndSession}
+              className={`mt-4 p-2 w-full rounded text-xs font-bold transition-all shadow-lg active:scale-95 shrink-0 ${gameState?.game_over ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-red-600/80 hover:bg-red-500 text-white'}`}
+            >
+              {gameState?.game_over ? 'New Game / Setup' : 'Abandon Match'}
+            </button>
+
+            {/* Persistent Audio Control for Gameplay Screen */}
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={() => setIsMuted(!isMuted)}
+                className="p-3 bg-slate-700 hover:bg-slate-600 rounded-full border border-slate-600 text-white transition-all active:scale-95 shadow-md flex items-center gap-2"
+              >
+                {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                <span className="text-[10px] uppercase font-bold tracking-widest">{isMuted ? 'Music Off' : 'Music On'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Root audio element — stays mounted and independent of screens */}
+      <audio
+        ref={audioRef}
+        src="https://www.chosic.com/wp-content/uploads/2021/07/The-Old-Tower-Inn.mp3"
+        loop
+      />
     </div>
   );
 }
